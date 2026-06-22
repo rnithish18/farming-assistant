@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ask a Question - Farming Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f7f0;
+            color: #1a3d1a;
+        }
+
+        header {
+            background-color: #2d5e2d;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        header a {
+            color: white;
+            text-decoration: none;
+            font-size: 1.5rem;
+        }
+
+        header h1 {
+            font-size: 1.3rem;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #2d5e2d;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 10px;
+            background-color: #2d5e2d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.05rem;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #999;
+        }
+
+        .answer-box {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: pre-wrap;
+            line-height: 1.5;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            margin-top: 20px;
+            color: #555;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/static/index.html">←</a>
+        <h1>💬 Ask a Question</h1>
+    </header>
+
+    <div class="container">
+        <textarea id="questionInput" placeholder="Type your farming question here... e.g. How do I protect my tomato plants from pests?"></textarea>
+        <button id="askButton" onclick="askQuestion()">Ask</button>
+
+        <div class="loading" id="loading">Thinking...</div>
+        <div class="answer-box" id="answerBox"></div>
+    </div>
+
+    <script>
+        async function askQuestion() {
+            const input = document.getElementById('questionInput');
+            const button = document.getElementById('askButton');
+            const loading = document.getElementById('loading');
+            const answerBox = document.getElementById('answerBox');
+
+            const question = input.value.trim();
+            if (!question) {
+                alert('Please type a question first.');
+                return;
+            }
+
+            button.disabled = true;
+            loading.style.display = 'block';
+            answerBox.style.display = 'none';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: question })
+                });
+
+                const data = await response.json();
+
+                answerBox.textContent = data.reply || 'Sorry, something went wrong.';
+                answerBox.style.display = 'block';
+            } catch (error) {
+                answerBox.textContent = 'Error: could not reach the server.';
+                answerBox.style.display = 'block';
+            } finally {
+                button.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

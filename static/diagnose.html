@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Plant Disease - Farming Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f7f0;
+            color: #1a3d1a;
+        }
+
+        header {
+            background-color: #2d5e2d;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        header a {
+            color: white;
+            text-decoration: none;
+            font-size: 1.5rem;
+        }
+
+        header h1 {
+            font-size: 1.3rem;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        .upload-box {
+            background: white;
+            border: 2px dashed #2d5e2d;
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .upload-box p {
+            margin-top: 10px;
+            color: #555;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        #previewImage {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 15px;
+            background-color: #2d5e2d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.05rem;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #999;
+        }
+
+        .answer-box {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: pre-wrap;
+            line-height: 1.5;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            margin-top: 20px;
+            color: #555;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/static/index.html">←</a>
+        <h1>📷 Check Plant Disease</h1>
+    </header>
+
+    <div class="container">
+        <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+            <div style="font-size: 2rem;">📁</div>
+            <p>Tap to choose a photo of your plant or leaf</p>
+            <img id="previewImage" alt="Selected plant photo">
+        </div>
+        <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect()">
+
+        <button id="diagnoseButton" onclick="diagnoseImage()" disabled>Diagnose</button>
+
+        <div class="loading" id="loading">Analyzing your photo...</div>
+        <div class="answer-box" id="answerBox"></div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        function handleFileSelect() {
+            const fileInput = document.getElementById('fileInput');
+            const previewImage = document.getElementById('previewImage');
+            const diagnoseButton = document.getElementById('diagnoseButton');
+
+            if (fileInput.files && fileInput.files[0]) {
+                selectedFile = fileInput.files[0];
+                previewImage.src = URL.createObjectURL(selectedFile);
+                previewImage.style.display = 'block';
+                diagnoseButton.disabled = false;
+            }
+        }
+
+        async function diagnoseImage() {
+            const button = document.getElementById('diagnoseButton');
+            const loading = document.getElementById('loading');
+            const answerBox = document.getElementById('answerBox');
+
+            if (!selectedFile) {
+                alert('Please choose a photo first.');
+                return;
+            }
+
+            button.disabled = true;
+            loading.style.display = 'block';
+            answerBox.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const response = await fetch('/diagnose', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                answerBox.textContent = data.diagnosis || 'Sorry, something went wrong.';
+                answerBox.style.display = 'block';
+            } catch (error) {
+                answerBox.textContent = 'Error: could not reach the server.';
+                answerBox.style.display = 'block';
+            } finally {
+                button.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
