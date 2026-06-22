@@ -2,16 +2,14 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from google import genai
-from google.genai import types
 from groq import Groq
+import base64
 import os
 from dotenv import load_dotenv
 import requests
 
 load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 app = FastAPI()
@@ -39,20 +37,27 @@ def chat(request: ChatRequest):
 @app.post("/diagnose")
 async def diagnose(file: UploadFile = File(...)):
     image_bytes = await file.read()
-    prompt = """You are an expert agricultural assistant helping Indian farmers.
-Look at this photo of a crop or plant leaf and respond in English only. Identify:
-1. The likely disease or pest problem (if any)
-2. How serious it looks
-3. Simple, practical treatment steps using affordable or locally available methods
-Keep the explanation simple and practical, avoiding technical jargon."""
-    response = gemini_client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[
-            types.Part.from_bytes(data=image_bytes, mime_type=file.content_type),
-            prompt
-        ]
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    response = groq_client.chat.completions.create(
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{file.content_type};base64,{image_b64}"}
+                    },
+                    {
+                        "type": "text",
+                        "text": "You are an expert agricultural assistant helping Indian farmers. Look at this photo of a crop or plant leaf and respond in English only. Identify: 1. The likely disease or pest problem if any 2. How serious it looks 3. Simple practical treatment steps using affordable locally available methods. Keep it simple and avoid technical jargon."
+                    }
+                ]
+            }
+        ],
+        max_tokens=1024
     )
-    return {"diagnosis": response.text}
+    return {"diagnosis": response.choices[0].message.content}
 
 @app.get("/weather")
 def get_weather(city: str):
