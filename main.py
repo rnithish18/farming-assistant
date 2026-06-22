@@ -41,7 +41,7 @@ Question: {request.message}"""
     )
     return {"reply": completion.choices[0].message.content}
 
-# 2. IMAGE DIAGNOSIS ENDPOINT (PRODUCTION VISION MODEL FIXED)
+# 2. IMAGE DIAGNOSIS ENDPOINT (STABLE PRODUCTION VERSION)
 @app.post("/diagnose")
 async def diagnose(file: UploadFile = File(...)):
     try:
@@ -53,7 +53,7 @@ async def diagnose(file: UploadFile = File(...)):
         and give clear, simple, practical treatment solutions in English for a regular farmer."""
 
         completion = client.chat.completions.create(
-            model="llama-3.2-90b-vision-preview",
+            model="llama-3.2-11b-vision-instant",
             messages=[
                 {
                     "role": "user",
