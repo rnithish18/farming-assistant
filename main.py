@@ -41,7 +41,7 @@ Question: {request.message}"""
     )
     return {"reply": completion.choices[0].message.content}
 
-# 2. IMAGE DIAGNOSIS ENDPOINT (FIXED & UPDATED MODEL)
+# 2. IMAGE DIAGNOSIS ENDPOINT (PRODUCTION VISION MODEL FIXED)
 @app.post("/diagnose")
 async def diagnose(file: UploadFile = File(...)):
     try:
@@ -52,9 +52,8 @@ async def diagnose(file: UploadFile = File(...)):
         Analyze this plant image. Identify the plant, identify any visible diseases or pests, 
         and give clear, simple, practical treatment solutions in English for a regular farmer."""
 
-        # Using the updated, active production model string
         completion = client.chat.completions.create(
-            model="llama-3.2-11b-vision-instant",
+            model="llama-3.2-90b-vision-preview",
             messages=[
                 {
                     "role": "user",
