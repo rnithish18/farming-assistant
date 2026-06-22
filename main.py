@@ -39,7 +39,7 @@ async def diagnose(file: UploadFile = File(...)):
     image_bytes = await file.read()
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
     response = groq_client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        model="qwen/qwen3.6-27b",
         messages=[
             {
                 "role": "user",
