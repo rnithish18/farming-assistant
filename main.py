@@ -1,15 +1,15 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from google import genai
-from google.genai import types
 import os
 from dotenv import load_dotenv
 import requests
+from groq import Groq
 
 load_dotenv()
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 app = FastAPI()
@@ -28,29 +28,14 @@ def chat(request: ChatRequest):
 Answer the following question simply and practically in English only.
 A farmer with no technical background should easily understand your answer.
 Question: {request.message}"""
-    response = client.models.generate_content(
-        model="gemini-2.0-flash-lite",
-        contents=prompt
-    )
-    return {"reply": response.text}
 
-@app.post("/diagnose")
-async def diagnose(file: UploadFile = File(...)):
-    image_bytes = await file.read()
-    prompt = """You are an expert agricultural assistant helping Indian farmers.
-Look at this photo of a crop or plant leaf and respond in English only. Identify:
-1. The likely disease or pest problem (if any)
-2. How serious it looks
-3. Simple, practical treatment steps using affordable or locally available methods
-Keep the explanation simple and practical, avoiding technical jargon."""
-    response = client.models.generate_content(
-        model="gemini-2.0-flash-lite",
-        contents=[
-            types.Part.from_bytes(data=image_bytes, mime_type=file.content_type),
-            prompt
-        ]
+    completion = client.chat.completions.create(
+        model="llama-3.3-70b-specdec",
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
     )
-    return {"diagnosis": response.text}
+    return {"reply": completion.choices[0].message.content}
 
 @app.get("/weather")
 def get_weather(city: str):
