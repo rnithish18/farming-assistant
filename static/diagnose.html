@@ -163,7 +163,14 @@
 
                 const data = await response.json();
 
-                answerBox.textContent = data.diagnosis || 'Sorry, something went wrong.';
+                // FIXED: Now reads the matching "reply" or "error" keys from the backend
+                if (data.reply) {
+                    answerBox.textContent = data.reply;
+                } else if (data.error) {
+                    answerBox.textContent = data.error;
+                } else {
+                    answerBox.textContent = 'Sorry, something went wrong processing the server data.';
+                }
                 answerBox.style.display = 'block';
             } catch (error) {
                 answerBox.textContent = 'Error: could not reach the server.';
