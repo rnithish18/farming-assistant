@@ -45,12 +45,12 @@ async def diagnose(file: UploadFile = File(...)):
                 "role": "user",
                 "content": [
                     {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:{file.content_type};base64,{image_b64}"}
-                    },
-                    {
                         "type": "text",
                         "text": "You are an expert agricultural assistant helping Indian farmers. Look at this photo of a crop or plant leaf and respond in English only. Identify: 1. The likely disease or pest problem if any 2. How serious it looks 3. Simple practical treatment steps using affordable locally available methods. Keep it simple and avoid technical jargon."
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{file.content_type};base64,{image_b64}"}
                     }
                 ]
             }
