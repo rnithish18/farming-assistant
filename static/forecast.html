@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rain Forecast - Farming Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background-color: #f0f7f0; color: #1a3d1a; }
+        header {
+            background-color: #2d5e2d; color: white;
+            padding: 15px 20px; display: flex; align-items: center; gap: 15px;
+        }
+        header a { color: white; text-decoration: none; font-size: 1.5rem; }
+        header h1 { font-size: 1.3rem; }
+        .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
+        .search-box { display: flex; gap: 10px; }
+        input {
+            flex: 1; padding: 12px; border: 2px solid #2d5e2d;
+            border-radius: 8px; font-size: 1rem;
+        }
+        button {
+            padding: 12px 20px; background-color: #2d5e2d; color: white;
+            border: none; border-radius: 8px; font-size: 1rem; cursor: pointer;
+        }
+        button:disabled { background-color: #999; }
+        .loading { text-align: center; margin-top: 20px; color: #555; display: none; }
+        .error-box {
+            background: #fff0f0; border: 1px solid #ffcccc;
+            border-radius: 8px; padding: 15px; margin-top: 20px;
+            color: #cc0000; display: none;
+        }
+        .city-title { font-size: 1.3rem; font-weight: bold; margin: 20px 0 10px; }
+        .day-card {
+            background: white; border-radius: 12px; padding: 15px;
+            margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .day-date { font-weight: bold; font-size: 1rem; }
+        .day-temp { font-size: 1.2rem; font-weight: bold; color: #2d5e2d; }
+        .day-desc { color: #555; font-size: 0.9rem; margin-bottom: 6px; text-transform: capitalize; }
+        .day-rain { font-size: 0.9rem; color: #2255aa; margin-bottom: 8px; }
+        .day-advice {
+            background: #f0f7f0; border-left: 4px solid #2d5e2d;
+            padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 0.9rem;
+        }
+        .rain-heavy { border-left-color: #cc0000; background: #fff0f0; }
+        .rain-light { border-left-color: #2255aa; background: #f0f0ff; }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/static/index.html">←</a>
+        <h1>🌧️ Rain & Forecast</h1>
+    </header>
+    <div class="container">
+        <div class="search-box">
+            <input type="text" id="cityInput" placeholder="Enter city e.g. Karur"
+                onkeypress="if(event.key==='Enter') getForecast()">
+            <button id="searchBtn" onclick="getForecast()">Search</button>
+        </div>
+        <div class="loading" id="loading">Fetching 7-day forecast...</div>
+        <div class="error-box" id="errorBox"></div>
+        <div id="forecastContainer"></div>
+    </div>
+    <script>
+        async function getForecast() {
+            const city = document.getElementById('cityInput').value.trim();
+            const btn = document.getElementById('searchBtn');
+            const loading = document.getElementById('loading');
+            const errorBox = document.getElementById('errorBox');
+            const container = document.getElementById('forecastContainer');
+
+            if (!city) { alert('Please enter a city name.'); return; }
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            errorBox.style.display = 'none';
+            container.innerHTML = '';
+
+            try {
+                const response = await fetch(`/forecast?city=${encodeURIComponent(city)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    errorBox.textContent = `Could not find forecast for "${city}".`;
+                    errorBox.style.display = 'block';
+                } else {
+                    container.innerHTML = `<div class="city-title">📍 ${data.city} — 7-Day Forecast</div>`;
+                    data.forecast.forEach(day => {
+                        const rainClass = day.rain_mm > 10 ? 'rain-heavy' : day.rain_mm > 2 ? 'rain-light' : '';
+                        const rainIcon = day.rain_mm > 10 ? '🌧️' : day.rain_mm > 2 ? '🌦️' : '☀️';
+                        container.innerHTML += `
+                        <div class="day-card">
+                            <div class="day-header">
+                                <div class="day-date">${formatDate(day.date)}</div>
+                                <div class="day-temp">${day.avg_temp}°C</div>
+                            </div>
+                            <div class="day-desc">${rainIcon} ${day.description}</div>
+                            <div class="day-rain">💧 Rain: ${day.rain_mm} mm &nbsp;|&nbsp; 💦 Humidity: ${day.avg_humidity}%</div>
+                            <div class="day-advice ${rainClass}">🌾 ${day.farming_advice}</div>
+                        </div>`;
+                    });
+                }
+            } catch (e) {
+                errorBox.textContent = 'Error: could not reach the server.';
+                errorBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        function formatDate(dateStr) {
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+        }
+    </script>
+</body>
+</html>

@@ -10,30 +10,25 @@
             padding: 0;
             box-sizing: border-box;
         }
-
         body {
             font-family: Arial, sans-serif;
             background-color: #f0f7f0;
             color: #1a3d1a;
         }
-
         header {
             background-color: #2d5e2d;
             color: white;
             padding: 20px;
             text-align: center;
         }
-
         header h1 {
             font-size: 1.8rem;
         }
-
         .container {
             max-width: 500px;
             margin: 30px auto;
             padding: 0 20px;
         }
-
         .card {
             background: white;
             border-radius: 12px;
@@ -45,17 +40,14 @@
             display: block;
             text-align: center;
         }
-
         .card h2 {
             font-size: 1.3rem;
             margin-bottom: 8px;
         }
-
         .card p {
             font-size: 0.95rem;
             color: #555;
         }
-
         .icon {
             font-size: 2.5rem;
             margin-bottom: 10px;
@@ -66,24 +58,41 @@
     <header>
         <h1>🌾 Farming Assistant</h1>
     </header>
-
     <div class="container">
         <a href="/static/chat.html" class="card">
             <div class="icon">💬</div>
             <h2>Ask a Question</h2>
             <p>Get farming advice in simple language</p>
         </a>
-
         <a href="/static/diagnose.html" class="card">
             <div class="icon">📷</div>
             <h2>Check Plant Disease</h2>
             <p>Upload a photo of your crop to diagnose problems</p>
         </a>
-
         <a href="/static/weather.html" class="card">
             <div class="icon">☀️</div>
             <h2>Weather</h2>
             <p>Check today's weather for your area</p>
+        </a>
+        <a href="/static/forecast.html" class="card">
+            <div class="icon">🌧️</div>
+            <h2>Rain Forecast</h2>
+            <p>7-day rain prediction with farming advice</p>
+        </a>
+        <a href="/static/market.html" class="card">
+            <div class="icon">📊</div>
+            <h2>Market Prices</h2>
+            <p>Check crop prices at your nearest mandi</p>
+        </a>
+        <a href="/static/soil.html" class="card">
+            <div class="icon">🌱</div>
+            <h2>Soil Tips</h2>
+            <p>Get crop and soil advice by season</p>
+        </a>
+        <a href="/static/pest.html" class="card">
+            <div class="icon">🐛</div>
+            <h2>Pest Alert</h2>
+            <p>Check common pests in your region this season</p>
         </a>
     </div>
 </body>

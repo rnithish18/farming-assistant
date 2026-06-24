@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Prices - Farming Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background-color: #f0f7f0; color: #1a3d1a; }
+        header {
+            background-color: #2d5e2d; color: white;
+            padding: 15px 20px; display: flex; align-items: center; gap: 15px;
+        }
+        header a { color: white; text-decoration: none; font-size: 1.5rem; }
+        header h1 { font-size: 1.3rem; }
+        .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
+        input, select {
+            width: 100%; padding: 12px; border: 2px solid #2d5e2d;
+            border-radius: 8px; font-size: 1rem; margin-bottom: 10px;
+            font-family: inherit;
+        }
+        button {
+            width: 100%; padding: 14px; background-color: #2d5e2d;
+            color: white; border: none; border-radius: 8px;
+            font-size: 1.05rem; cursor: pointer;
+        }
+        button:disabled { background-color: #999; }
+        .loading { text-align: center; margin-top: 20px; color: #555; display: none; }
+        .result-box {
+            background: white; border-radius: 12px; padding: 20px;
+            margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: pre-wrap; line-height: 1.8; display: none;
+            font-size: 0.95rem;
+        }
+        .note {
+            background: #fffbe6; border-left: 4px solid #f0a500;
+            padding: 10px 14px; border-radius: 0 8px 8px 0;
+            font-size: 0.85rem; color: #7a5c00; margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/static/index.html">←</a>
+        <h1>📊 Market Prices</h1>
+    </header>
+    <div class="container">
+        <input type="text" id="cropInput" placeholder="Enter crop name e.g. Tomato, Rice, Onion">
+        <select id="stateSelect">
+            <option value="Tamil Nadu">Tamil Nadu</option>
+            <option value="Andhra Pradesh">Andhra Pradesh</option>
+            <option value="Karnataka">Karnataka</option>
+            <option value="Maharashtra">Maharashtra</option>
+            <option value="Punjab">Punjab</option>
+            <option value="Uttar Pradesh">Uttar Pradesh</option>
+            <option value="Rajasthan">Rajasthan</option>
+            <option value="Gujarat">Gujarat</option>
+            <option value="West Bengal">West Bengal</option>
+            <option value="Madhya Pradesh">Madhya Pradesh</option>
+        </select>
+        <button id="searchBtn" onclick="getPrices()">Check Prices</button>
+        <div class="loading" id="loading">Fetching market prices...</div>
+        <div class="result-box" id="resultBox"></div>
+        <div class="note">⚠️ Prices are AI estimates based on current market trends. Always verify with your local mandi before selling.</div>
+    </div>
+    <script>
+        async function getPrices() {
+            const crop = document.getElementById('cropInput').value.trim();
+            const state = document.getElementById('stateSelect').value;
+            const btn = document.getElementById('searchBtn');
+            const loading = document.getElementById('loading');
+            const resultBox = document.getElementById('resultBox');
+
+            if (!crop) { alert('Please enter a crop name.'); return; }
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            resultBox.style.display = 'none';
+
+            try {
+                const response = await fetch(`/market?crop=${encodeURIComponent(crop)}&state=${encodeURIComponent(state)}`);
+                const data = await response.json();
+                resultBox.textContent = data.prices;
+                resultBox.style.display = 'block';
+            } catch (e) {
+                resultBox.textContent = 'Error: could not reach the server.';
+                resultBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

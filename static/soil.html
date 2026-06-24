@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soil Tips - Farming Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background-color: #f0f7f0; color: #1a3d1a; }
+        header {
+            background-color: #2d5e2d; color: white;
+            padding: 15px 20px; display: flex; align-items: center; gap: 15px;
+        }
+        header a { color: white; text-decoration: none; font-size: 1.5rem; }
+        header h1 { font-size: 1.3rem; }
+        .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
+        select, input {
+            width: 100%; padding: 12px; border: 2px solid #2d5e2d;
+            border-radius: 8px; font-size: 1rem; margin-bottom: 10px;
+            font-family: inherit; background: white;
+        }
+        button {
+            width: 100%; padding: 14px; background-color: #2d5e2d;
+            color: white; border: none; border-radius: 8px;
+            font-size: 1.05rem; cursor: pointer;
+        }
+        button:disabled { background-color: #999; }
+        .loading { text-align: center; margin-top: 20px; color: #555; display: none; }
+        .result-box {
+            background: white; border-radius: 12px; padding: 20px;
+            margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: pre-wrap; line-height: 1.8; display: none; font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/static/index.html">←</a>
+        <h1>🌱 Soil Tips by Season</h1>
+    </header>
+    <div class="container">
+        <input type="text" id="cropInput" placeholder="Enter crop name e.g. Rice, Cotton, Groundnut">
+        <select id="seasonSelect">
+            <option value="Kharif (June-October, monsoon season)">Kharif — June to October (Monsoon)</option>
+            <option value="Rabi (November-March, winter season)">Rabi — November to March (Winter)</option>
+            <option value="Zaid (April-June, summer season)">Zaid — April to June (Summer)</option>
+        </select>
+        <select id="soilSelect">
+            <option value="Black cotton soil">Black Cotton Soil</option>
+            <option value="Red soil">Red Soil</option>
+            <option value="Alluvial soil">Alluvial Soil</option>
+            <option value="Sandy soil">Sandy Soil</option>
+            <option value="Clay soil">Clay Soil</option>
+            <option value="Loamy soil">Loamy Soil</option>
+        </select>
+        <button id="getTipsBtn" onclick="getSoilTips()">Get Soil Tips</button>
+        <div class="loading" id="loading">Getting soil tips...</div>
+        <div class="result-box" id="resultBox"></div>
+    </div>
+    <script>
+        async function getSoilTips() {
+            const crop = document.getElementById('cropInput').value.trim();
+            const season = document.getElementById('seasonSelect').value;
+            const soil = document.getElementById('soilSelect').value;
+            const btn = document.getElementById('getTipsBtn');
+            const loading = document.getElementById('loading');
+            const resultBox = document.getElementById('resultBox');
+
+            if (!crop) { alert('Please enter a crop name.'); return; }
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            resultBox.style.display = 'none';
+
+            try {
+                const response = await fetch(`/soil?crop=${encodeURIComponent(crop)}&season=${encodeURIComponent(season)}&soil_type=${encodeURIComponent(soil)}`);
+                const data = await response.json();
+                resultBox.textContent = data.tips;
+                resultBox.style.display = 'block';
+            } catch (e) {
+                resultBox.textContent = 'Error: could not reach the server.';
+                resultBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

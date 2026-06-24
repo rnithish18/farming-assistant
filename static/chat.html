@@ -5,132 +5,173 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ask a Question - Farming Assistant</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f7f0;
-            color: #1a3d1a;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background-color: #f0f7f0; color: #1a3d1a; }
         header {
-            background-color: #2d5e2d;
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
+            background-color: #2d5e2d; color: white;
+            padding: 15px 20px; display: flex; align-items: center; gap: 15px;
         }
-
-        header a {
-            color: white;
-            text-decoration: none;
-            font-size: 1.5rem;
+        header a { color: white; text-decoration: none; font-size: 1.5rem; }
+        header h1 { font-size: 1.3rem; flex: 1; }
+        .lang-toggle {
+            display: flex; background: rgba(255,255,255,0.2);
+            border-radius: 20px; overflow: hidden;
         }
-
-        header h1 {
-            font-size: 1.3rem;
+        .lang-toggle button {
+            background: none; border: none; color: white;
+            padding: 6px 12px; font-size: 0.85rem; cursor: pointer;
+            width: auto; margin: 0;
         }
-
-        .container {
-            max-width: 500px;
-            margin: 20px auto;
-            padding: 0 20px;
+        .lang-toggle button.active {
+            background: white; color: #2d5e2d; font-weight: bold;
         }
-
+        .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
+        .input-row { display: flex; gap: 8px; align-items: flex-start; }
         textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #2d5e2d;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-family: inherit;
-            resize: vertical;
-            min-height: 80px;
+            flex: 1; padding: 12px; border: 2px solid #2d5e2d;
+            border-radius: 8px; font-size: 1rem; font-family: inherit;
+            resize: vertical; min-height: 80px;
         }
-
-        button {
-            width: 100%;
-            padding: 14px;
-            margin-top: 10px;
-            background-color: #2d5e2d;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1.05rem;
-            cursor: pointer;
+        .mic-btn {
+            width: 48px; height: 48px; border-radius: 50%;
+            background-color: #2d5e2d; color: white; border: none;
+            font-size: 1.3rem; cursor: pointer; flex-shrink: 0;
+            margin-top: 2px; padding: 0;
         }
-
-        button:disabled {
-            background-color: #999;
+        .mic-btn.recording { background-color: #cc0000; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        .ask-btn {
+            width: 100%; padding: 14px; margin-top: 10px;
+            background-color: #2d5e2d; color: white; border: none;
+            border-radius: 8px; font-size: 1.05rem; cursor: pointer;
         }
-
+        .ask-btn:disabled { background-color: #999; }
         .answer-box {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-top: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            white-space: pre-wrap;
-            line-height: 1.5;
-            display: none;
+            background: white; border-radius: 12px; padding: 20px;
+            margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: pre-wrap; line-height: 1.5; display: none;
         }
-
-        .loading {
-            text-align: center;
-            margin-top: 20px;
-            color: #555;
-            display: none;
+        .loading { text-align: center; margin-top: 20px; color: #555; display: none; }
+        .voice-status {
+            text-align: center; color: #cc0000;
+            font-size: 0.9rem; margin-top: 6px; display: none;
         }
     </style>
 </head>
 <body>
     <header>
         <a href="/static/index.html">←</a>
-        <h1>💬 Ask a Question</h1>
+        <h1 id="pageTitle">💬 Ask a Question</h1>
+        <div class="lang-toggle">
+            <button id="btnEn" class="active" onclick="setLang('en')">EN</button>
+            <button id="btnTa" onclick="setLang('ta')">தமிழ்</button>
+        </div>
     </header>
-
     <div class="container">
-        <textarea id="questionInput" placeholder="Type your farming question here... e.g. How do I protect my tomato plants from pests?"></textarea>
-        <button id="askButton" onclick="askQuestion()">Ask</button>
-
+        <div class="input-row">
+            <textarea id="questionInput" placeholder="Type your farming question here..."></textarea>
+            <button class="mic-btn" id="micBtn" onclick="toggleVoice()">🎤</button>
+        </div>
+        <div class="voice-status" id="voiceStatus"></div>
+        <button class="ask-btn" id="askButton" onclick="askQuestion()">Ask</button>
         <div class="loading" id="loading">Thinking...</div>
         <div class="answer-box" id="answerBox"></div>
     </div>
-
     <script>
+        let currentLang = 'en';
+        let recognition = null;
+        let isRecording = false;
+
+        const t = {
+            en: {
+                title: '💬 Ask a Question',
+                placeholder: 'Type your farming question here...',
+                askBtn: 'Ask',
+                loading: 'Thinking...',
+                systemMsg: 'You are a helpful farming assistant for farmers in India. Answer questions simply and practically in English only. Avoid technical jargon.',
+                voiceListening: '🔴 Listening... speak now',
+                voiceDone: '✅ Got it! Click Ask to continue.'
+            },
+            ta: {
+                title: '💬 கேள்வி கேளுங்கள்',
+                placeholder: 'உங்கள் விவசாய கேள்வியை இங்கே தட்டச்சு செய்யவும்...',
+                askBtn: 'கேளுங்கள்',
+                loading: 'யோசிக்கிறேன்...',
+                systemMsg: 'நீங்கள் இந்திய விவசாயிகளுக்கு உதவும் ஒரு விவசாய உதவியாளர். கேள்விகளுக்கு தமிழில் மட்டும் எளிமையாகவும் நடைமுறையிலும் பதிலளிக்கவும்.',
+                voiceListening: '🔴 கேட்கிறேன்... இப்போது பேசுங்கள்',
+                voiceDone: '✅ கிடைத்தது! தொடர கேளுங்கள் கிளிக் செய்யுங்கள்.'
+            }
+        };
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.getElementById('pageTitle').textContent = t[lang].title;
+            document.getElementById('questionInput').placeholder = t[lang].placeholder;
+            document.getElementById('askButton').textContent = t[lang].askBtn;
+            document.getElementById('loading').textContent = t[lang].loading;
+            document.getElementById('btnEn').classList.toggle('active', lang === 'en');
+            document.getElementById('btnTa').classList.toggle('active', lang === 'ta');
+        }
+
+        function toggleVoice() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Voice input not supported. Please use Chrome browser.');
+                return;
+            }
+            if (isRecording) { recognition.stop(); return; }
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SR();
+            recognition.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            recognition.interimResults = false;
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('micBtn').classList.add('recording');
+                document.getElementById('micBtn').textContent = '⏹';
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceListening;
+                document.getElementById('voiceStatus').style.display = 'block';
+            };
+            recognition.onresult = (e) => {
+                document.getElementById('questionInput').value = e.results[0][0].transcript;
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceDone;
+            };
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+            };
+            recognition.onerror = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+                document.getElementById('voiceStatus').textContent = '❌ Could not hear. Try again.';
+            };
+            recognition.start();
+        }
+
         async function askQuestion() {
             const input = document.getElementById('questionInput');
             const button = document.getElementById('askButton');
             const loading = document.getElementById('loading');
             const answerBox = document.getElementById('answerBox');
-
             const question = input.value.trim();
-            if (!question) {
-                alert('Please type a question first.');
-                return;
-            }
-
+            if (!question) { alert('Please type or speak a question first.'); return; }
             button.disabled = true;
             loading.style.display = 'block';
             answerBox.style.display = 'none';
-
+            document.getElementById('voiceStatus').style.display = 'none';
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: question })
+                    body: JSON.stringify({
+                        message: question,
+                        system_message: t[currentLang].systemMsg
+                    })
                 });
-
                 const data = await response.json();
-
                 answerBox.textContent = data.reply || 'Sorry, something went wrong.';
                 answerBox.style.display = 'block';
-            } catch (error) {
+            } catch (e) {
                 answerBox.textContent = 'Error: could not reach the server.';
                 answerBox.style.display = 'block';
             } finally {
