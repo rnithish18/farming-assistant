@@ -1,120 +1,209 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rain Forecast - Farming Assistant</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background-color: #f0f7f0; color: #1a3d1a; }
-        header {
-            background-color: #2d5e2d; color: white;
-            padding: 15px 20px; display: flex; align-items: center; gap: 15px;
-        }
-        header a { color: white; text-decoration: none; font-size: 1.5rem; }
-        header h1 { font-size: 1.3rem; }
-        .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
-        .search-box { display: flex; gap: 10px; }
-        input {
-            flex: 1; padding: 12px; border: 2px solid #2d5e2d;
-            border-radius: 8px; font-size: 1rem;
-        }
-        button {
-            padding: 12px 20px; background-color: #2d5e2d; color: white;
-            border: none; border-radius: 8px; font-size: 1rem; cursor: pointer;
-        }
-        button:disabled { background-color: #999; }
-        .loading { text-align: center; margin-top: 20px; color: #555; display: none; }
-        .error-box {
-            background: #fff0f0; border: 1px solid #ffcccc;
-            border-radius: 8px; padding: 15px; margin-top: 20px;
-            color: #cc0000; display: none;
-        }
-        .city-title { font-size: 1.3rem; font-weight: bold; margin: 20px 0 10px; }
-        .day-card {
-            background: white; border-radius: 12px; padding: 15px;
-            margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .day-date { font-weight: bold; font-size: 1rem; }
-        .day-temp { font-size: 1.2rem; font-weight: bold; color: #2d5e2d; }
-        .day-desc { color: #555; font-size: 0.9rem; margin-bottom: 6px; text-transform: capitalize; }
-        .day-rain { font-size: 0.9rem; color: #2255aa; margin-bottom: 8px; }
-        .day-advice {
-            background: #f0f7f0; border-left: 4px solid #2d5e2d;
-            padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 0.9rem;
-        }
-        .rain-heavy { border-left-color: #cc0000; background: #fff0f0; }
-        .rain-light { border-left-color: #2255aa; background: #f0f0ff; }
-    </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Rain Forecast - Farming Assistant</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;background:#f0f7f0;color:#1a3d1a}
+  header{background:#2d5e2d;color:white;padding:15px 20px;display:flex;align-items:center;justify-content:space-between}
+  .header-left{display:flex;align-items:center;gap:15px}
+  header a{color:white;text-decoration:none;font-size:1.5rem}
+  header h1{font-size:1.3rem}
+  .lang-toggle{display:flex;background:rgba(255,255,255,0.15);border-radius:20px;overflow:hidden}
+  .lang-btn{padding:6px 14px;border:none;background:transparent;color:white;cursor:pointer;font-size:13px;font-weight:600}
+  .lang-btn.active{background:white;color:#2d5e2d;border-radius:20px}
+  .container{max-width:500px;margin:20px auto;padding:0 20px}
+  .search-box{display:flex;gap:10px}
+  input{flex:1;padding:12px;border:2px solid #2d5e2d;border-radius:8px;font-size:1rem;font-family:inherit;outline:none}
+  .mic-btn{width:46px;height:46px;background:#2d5e2d;color:white;border:none;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .mic-btn.listening{background:#c0392b;animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+  .search-btn{padding:12px 20px;background:#2d5e2d;color:white;border:none;border-radius:8px;font-size:1rem;cursor:pointer}
+  .search-btn:disabled{background:#999}
+  .section-title{font-size:1.1rem;font-weight:bold;color:#2d5e2d;margin-bottom:14px}
+  .day-card{background:white;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:4px solid #2d5e2d}
+  .day-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .day-date{font-weight:700;font-size:15px;color:#333}
+  .day-temp{font-size:18px;font-weight:700;color:#2d5e2d}
+  .day-desc{font-size:13px;color:#666;margin-bottom:6px}
+  .day-stats{display:flex;gap:16px;font-size:13px;color:#555;margin-bottom:8px}
+  .advice-row{background:#f1f8e9;border-left:3px solid #2d5e2d;border-radius:6px;padding:10px 12px;font-size:13px;color:#333;display:flex;align-items:center;gap:8px}
+  .speak-small{background:transparent;border:none;cursor:pointer;font-size:16px;flex-shrink:0;margin-left:auto}
+  .loading{text-align:center;margin-top:20px;color:#555;display:none}
+  .error-box{background:#fff0f0;border:1px solid #ffcccc;border-radius:8px;padding:15px;margin-top:20px;color:#cc0000;display:none}
+  #result{display:none}
+</style>
 </head>
 <body>
-    <header>
-        <a href="/static/index.html">←</a>
-        <h1>🌧️ Rain & Forecast</h1>
-    </header>
-    <div class="container">
-        <div class="search-box">
-            <input type="text" id="cityInput" placeholder="Enter city e.g. Karur"
-                onkeypress="if(event.key==='Enter') getForecast()">
-            <button id="searchBtn" onclick="getForecast()">Search</button>
+<header>
+  <div class="header-left">
+    <a href="/static/index.html">←</a>
+    <h1 id="h-title">🌧️ Rain & Forecast</h1>
+  </div>
+  <div class="lang-toggle">
+    <button class="lang-btn active" id="btn-en" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" id="btn-ta" onclick="setLang('ta')">தமிழ்</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="search-box">
+    <input type="text" id="cityInput" placeholder="Enter city name e.g. Karur"
+      onkeypress="if(event.key==='Enter') getForecast()"/>
+    <button class="mic-btn" id="micBtn" onclick="startMic()" title="Speak city name">🎤</button>
+    <button class="search-btn" id="searchBtn" onclick="getForecast()">Search</button>
+  </div>
+  <div class="loading" id="loading">Loading forecast...</div>
+  <div class="error-box" id="errorBox"></div>
+  <div id="result">
+    <div class="section-title" id="section-title"></div>
+    <div id="forecast-list"></div>
+  </div>
+</div>
+
+<script>
+let currentLang = 'en';
+let forecastAdvices = [];
+
+const T = {
+  en: {
+    title: '🌧️ Rain & Forecast',
+    placeholder: 'Enter city name e.g. Karur',
+    searchBtn: 'Search',
+    loading: 'Loading forecast...',
+    rain: 'Rain', humidity: 'Humidity',
+    sectionTitle: city => `📍 ${city} — 7-Day Forecast`,
+    errorNotFound: city => `Could not find forecast for "${city}". Please enter city name in English.`,
+    errorServer: 'Error: could not reach the server.',
+    micListen: 'Listening...'
+  },
+  ta: {
+    title: '🌧️ மழை & முன்னறிவிப்பு',
+    placeholder: 'நகர பெயரை ஆங்கிலத்தில் உள்ளிடவும் e.g. Karur',
+    searchBtn: 'தேடு',
+    loading: 'முன்னறிவிப்பு பெறுகிறோம்...',
+    rain: 'மழை', humidity: 'ஈரப்பதம்',
+    sectionTitle: city => `📍 ${city} — 7 நாள் முன்னறிவிப்பு`,
+    errorNotFound: city => `"${city}" கண்டுபிடிக்கவில்லை. நகர பெயரை ஆங்கிலத்தில் உள்ளிடவும்.`,
+    errorServer: 'பிழை: சேவையகத்தை அணுக முடியவில்லை.',
+    micListen: 'கேட்கிறோம்...'
+  }
+};
+
+function setLang(lang) {
+  currentLang = lang;
+  document.getElementById('btn-en').classList.toggle('active', lang==='en');
+  document.getElementById('btn-ta').classList.toggle('active', lang==='ta');
+  const t = T[lang];
+  document.getElementById('h-title').textContent = t.title;
+  document.getElementById('cityInput').placeholder = t.placeholder;
+  document.getElementById('searchBtn').textContent = t.searchBtn;
+  document.getElementById('loading').textContent = t.loading;
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  if (currentLang === 'ta') {
+    const days = ['ஞாயிறு','திங்கள்','செவ்வாய்','புதன்','வியாழன்','வெள்ளி','சனி'];
+    const mons = ['ஜன','பிப்','மார்','ஏப்','மே','ஜூன்','ஜூல்','ஆக','செப்','அக்','நவ','டிச்'];
+    return `${days[d.getDay()]}, ${d.getDate()} ${mons[d.getMonth()]}`;
+  }
+  return d.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
+}
+
+function startMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert('Voice input not supported. Please use Chrome.'); return; }
+  const recognition = new SR();
+  recognition.lang = 'en-IN';
+  recognition.interimResults = false;
+  const micBtn = document.getElementById('micBtn');
+  const input = document.getElementById('cityInput');
+  micBtn.classList.add('listening');
+  micBtn.textContent = '⏹️';
+  input.placeholder = T[currentLang].micListen;
+  recognition.start();
+  recognition.onresult = (e) => {
+    input.value = e.results[0][0].transcript.trim();
+    micBtn.classList.remove('listening');
+    micBtn.textContent = '🎤';
+    input.placeholder = T[currentLang].placeholder;
+    getForecast();
+  };
+  recognition.onerror = recognition.onend = () => {
+    micBtn.classList.remove('listening');
+    micBtn.textContent = '🎤';
+    input.placeholder = T[currentLang].placeholder;
+  };
+}
+
+async function getForecast() {
+  const city = document.getElementById('cityInput').value.trim();
+  if (!city) return;
+  document.getElementById('searchBtn').disabled = true;
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('errorBox').style.display = 'none';
+  try {
+    const res = await fetch(`/forecast?city=${encodeURIComponent(city)}&lang=${currentLang}`);
+    const data = await res.json();
+    document.getElementById('loading').style.display = 'none';
+    const t = T[currentLang];
+    if (data.error) {
+      document.getElementById('errorBox').textContent = t.errorNotFound(city);
+      document.getElementById('errorBox').style.display = 'block';
+      return;
+    }
+    document.getElementById('section-title').textContent = t.sectionTitle(data.city);
+    forecastAdvices = data.forecast.map(d => d.farming_advice);
+    const list = document.getElementById('forecast-list');
+    list.innerHTML = '';
+    data.forecast.forEach((day, i) => {
+      const borderColor = day.rain_mm > 10 ? '#1565c0' : day.rain_mm > 2 ? '#1976d2' : '#2d5e2d';
+      const icon = day.rain_mm > 10 ? '⛈️' : day.rain_mm > 2 ? '🌦️' : '☀️';
+      const card = document.createElement('div');
+      card.className = 'day-card';
+      card.style.borderLeftColor = borderColor;
+      card.innerHTML = `
+        <div class="day-header">
+          <span class="day-date">${formatDate(day.date)}</span>
+          <span class="day-temp">${day.avg_temp}°C</span>
         </div>
-        <div class="loading" id="loading">Fetching 7-day forecast...</div>
-        <div class="error-box" id="errorBox"></div>
-        <div id="forecastContainer"></div>
-    </div>
-    <script>
-        async function getForecast() {
-            const city = document.getElementById('cityInput').value.trim();
-            const btn = document.getElementById('searchBtn');
-            const loading = document.getElementById('loading');
-            const errorBox = document.getElementById('errorBox');
-            const container = document.getElementById('forecastContainer');
+        <div class="day-desc">${icon} ${day.description}</div>
+        <div class="day-stats">
+          <span>💧 ${t.rain}: ${day.rain_mm} mm</span>
+          <span>💦 ${t.humidity}: ${day.avg_humidity}%</span>
+        </div>
+        <div class="advice-row">
+          🌾 ${day.farming_advice}
+          <button class="speak-small" onclick="speakAdvice(${i})">🔊</button>
+        </div>`;
+      list.appendChild(card);
+    });
+    document.getElementById('result').style.display = 'block';
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('errorBox').textContent = T[currentLang].errorServer;
+    document.getElementById('errorBox').style.display = 'block';
+  } finally {
+    document.getElementById('searchBtn').disabled = false;
+  }
+}
 
-            if (!city) { alert('Please enter a city name.'); return; }
+function speakAdvice(i) {
+  if (!forecastAdvices[i]) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(forecastAdvices[i]);
+  utter.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+  utter.rate = 0.9;
+  window.speechSynthesis.speak(utter);
+}
 
-            btn.disabled = true;
-            loading.style.display = 'block';
-            errorBox.style.display = 'none';
-            container.innerHTML = '';
-
-            try {
-                const response = await fetch(`/forecast?city=${encodeURIComponent(city)}`);
-                const data = await response.json();
-
-                if (data.error) {
-                    errorBox.textContent = `Could not find forecast for "${city}".`;
-                    errorBox.style.display = 'block';
-                } else {
-                    container.innerHTML = `<div class="city-title">📍 ${data.city} — 7-Day Forecast</div>`;
-                    data.forecast.forEach(day => {
-                        const rainClass = day.rain_mm > 10 ? 'rain-heavy' : day.rain_mm > 2 ? 'rain-light' : '';
-                        const rainIcon = day.rain_mm > 10 ? '🌧️' : day.rain_mm > 2 ? '🌦️' : '☀️';
-                        container.innerHTML += `
-                        <div class="day-card">
-                            <div class="day-header">
-                                <div class="day-date">${formatDate(day.date)}</div>
-                                <div class="day-temp">${day.avg_temp}°C</div>
-                            </div>
-                            <div class="day-desc">${rainIcon} ${day.description}</div>
-                            <div class="day-rain">💧 Rain: ${day.rain_mm} mm &nbsp;|&nbsp; 💦 Humidity: ${day.avg_humidity}%</div>
-                            <div class="day-advice ${rainClass}">🌾 ${day.farming_advice}</div>
-                        </div>`;
-                    });
-                }
-            } catch (e) {
-                errorBox.textContent = 'Error: could not reach the server.';
-                errorBox.style.display = 'block';
-            } finally {
-                btn.disabled = false;
-                loading.style.display = 'none';
-            }
-        }
-
-        function formatDate(dateStr) {
-            const d = new Date(dateStr);
-            return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-        }
-    </script>
+document.getElementById('cityInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') getForecast();
+});
+</script>
 </body>
 </html>

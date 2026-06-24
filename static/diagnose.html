@@ -7,43 +7,107 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background-color: #f0f7f0; color: #1a3d1a; }
-        header { background-color: #2d5e2d; color: white; padding: 15px 20px; display: flex; align-items: center; gap: 15px; }
+        header { background-color: #2d5e2d; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
         header a { color: white; text-decoration: none; font-size: 1.5rem; }
         header h1 { font-size: 1.3rem; }
+        .lang-toggle { display: flex; background: rgba(255,255,255,0.15); border-radius: 20px; overflow: hidden; }
+        .lang-btn { padding: 6px 14px; border: none; background: transparent; color: white; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .lang-btn.active { background: white; color: #2d5e2d; border-radius: 20px; }
         .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
         .upload-box { background: white; border: 2px dashed #2d5e2d; border-radius: 12px; padding: 30px 20px; text-align: center; cursor: pointer; }
-        .upload-box p { margin-top: 10px; color: #555; }
+        .upload-box p { margin-top: 10px; color: #555; font-size: 0.95rem; }
         #fileInput { display: none; }
-        #previewImage { max-width: 100%; border-radius: 8px; margin-top: 15px; display: none; }
-        button { width: 100%; padding: 14px; margin-top: 15px; background-color: #2d5e2d; color: white; border: none; border-radius: 8px; font-size: 1.05rem; cursor: pointer; }
-        button:disabled { background-color: #999; }
-        .answer-box { background: white; border-radius: 12px; padding: 20px; margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); white-space: pre-wrap; line-height: 1.5; display: none; }
+        #previewImage { max-width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px; margin-top: 15px; display: none; }
+        .action-btn { width: 100%; padding: 14px; margin-top: 15px; background-color: #2d5e2d; color: white; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: 600; cursor: pointer; }
+        .action-btn:disabled { background-color: #999; }
         .loading { text-align: center; margin-top: 20px; color: #555; display: none; }
+        .answer-box { background: white; border-radius: 12px; padding: 20px; margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none; }
+        .answer-text { white-space: pre-wrap; line-height: 1.6; font-size: 0.95rem; color: #1a3d1a; margin-bottom: 15px; }
+        .answer-footer { display: flex; justify-content: flex-end; border-top: 1px solid #eee; padding-top: 10px; }
+        .speak-btn { background: #e8f5e9; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+        .speak-btn:hover { background: #c8e6c9; }
     </style>
 </head>
 <body>
     <header>
-        <a href="/static/index.html">←</a>
-        <h1>📷 Check Plant Disease</h1>
+        <div class="header-left">
+            <a href="/static/index.html">←</a>
+            <h1 id="h-title">📷 Check Plant Disease</h1>
+        </div>
+        <div class="lang-toggle">
+            <button class="lang-btn active" id="btn-en" onclick="setLang('en')">EN</button>
+            <button class="lang-btn" id="btn-ta" onclick="setLang('ta')">தமிழ்</button>
+        </div>
     </header>
+
     <div class="container">
         <div class="upload-box" onclick="document.getElementById('fileInput').click()">
-            <div style="font-size: 2rem;">📁</div>
-            <p>Tap to choose a photo of your plant or leaf</p>
+            <div style="font-size: 2.5rem;">📸</div>
+            <p id="uploadText">Tap to open Camera or Upload Leaf Photo</p>
             <img id="previewImage" alt="Selected plant photo">
         </div>
-        <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect()">
-        <button id="diagnoseButton" onclick="diagnoseImage()" disabled>Diagnose</button>
+        <input type="file" id="fileInput" accept="image/*" capture="environment" onchange="handleFileSelect()">
+        
+        <button id="diagnoseButton" class="action-btn" onclick="diagnoseImage()" disabled>Diagnose</button>
+        
         <div class="loading" id="loading">Analyzing your photo...</div>
-        <div class="answer-box" id="answerBox"></div>
+        
+        <div class="answer-box" id="answerBox">
+            <div class="answer-text" id="answerText"></div>
+            <div class="answer-footer">
+                <button class="speak-btn" id="speakBtn" onclick="speakResult()" title="Read aloud">🔊</button>
+            </div>
+        </div>
     </div>
+
     <script>
         let selectedFile = null;
+        let currentLang = 'en';
+        let currentDiagnosisText = '';
+
+        // UI Translation Text Matrix
+        const T = {
+            en: {
+                title: '📷 Check Plant Disease',
+                uploadText: 'Tap to open Camera or Upload Leaf Photo',
+                diagnoseBtn: 'Diagnose',
+                loading: 'Analyzing your photo...',
+                errorEmpty: 'Please choose or capture a photo first.',
+                errorServer: 'Error: could not reach the server.'
+            },
+            ta: {
+                title: '📷 பயிர் நோய் கண்டறிதல்',
+                uploadText: 'கேமராவைத் திறக்க அல்லது இலையின் புகைப்படத்தைப் பதிவேற்ற தட்டவும்',
+                diagnoseBtn: 'கண்டறி',
+                loading: 'புகைப்படத்தை ஆய்வு செய்கிறோம்...',
+                errorEmpty: 'முதலில் ஒரு புகைப்படத்தைத் தேர்ந்தெடுக்கவும் அல்லது எடுக்கவும்.',
+                errorServer: 'பிழை: சேவையகத்தை அணுக முடியவில்லை.'
+            }
+        };
+
+        // Switch application language configuration
+        function setLang(lang) {
+            currentLang = lang;
+            document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+            document.getElementById('btn-ta').classList.toggle('active', lang === 'ta');
+            
+            const t = T[lang];
+            document.getElementById('h-title').textContent = t.title;
+            document.getElementById('uploadText').textContent = t.uploadText;
+            document.getElementById('diagnoseButton').textContent = t.diagnoseBtn;
+            document.getElementById('loading').textContent = t.loading;
+            
+            // If an answer is displayed and we switch languages, reset audio controls
+            window.speechSynthesis.cancel();
+            document.getElementById('speakBtn').textContent = '🔊';
+        }
 
         function handleFileSelect() {
             const fileInput = document.getElementById('fileInput');
             const previewImage = document.getElementById('previewImage');
             const diagnoseButton = document.getElementById('diagnoseButton');
+            
             if (fileInput.files && fileInput.files[0]) {
                 selectedFile = fileInput.files[0];
                 previewImage.src = URL.createObjectURL(selectedFile);
@@ -52,12 +116,25 @@
             }
         }
 
+        // Strip markdown markers out so text reads and synthesizes cleanly
+        function cleanText(text) {
+            return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+        }
+
         async function diagnoseImage() {
             const button = document.getElementById('diagnoseButton');
             const loading = document.getElementById('loading');
             const answerBox = document.getElementById('answerBox');
+            const answerText = document.getElementById('answerText');
 
-            if (!selectedFile) { alert('Please choose a photo first.'); return; }
+            if (!selectedFile) { 
+                alert(T[currentLang].errorEmpty); 
+                return; 
+            }
+
+            // Stop any active speech processing
+            window.speechSynthesis.cancel();
+            document.getElementById('speakBtn').textContent = '🔊';
 
             button.disabled = true;
             loading.style.display = 'block';
@@ -67,20 +144,57 @@
             formData.append('file', selectedFile);
 
             try {
-                const response = await fetch('/diagnose', {
+                // Pass language preference as a query parameter match to main.py implementation
+                const response = await fetch(`/diagnose?lang=${currentLang}`, {
                     method: 'POST',
                     body: formData
                 });
                 const data = await response.json();
-                answerBox.textContent = data.diagnosis || data.detail || JSON.stringify(data);
+                
+                let rawContent = data.diagnosis || data.detail || JSON.stringify(data);
+                currentDiagnosisText = cleanText(rawContent);
+                
+                answerText.textContent = currentDiagnosisText;
                 answerBox.style.display = 'block';
             } catch (error) {
-                answerBox.textContent = 'Error: could not reach the server.';
+                answerText.textContent = T[currentLang].errorServer;
                 answerBox.style.display = 'block';
             } finally {
                 button.disabled = false;
                 loading.style.display = 'none';
             }
+        }
+
+        // Voice Reader Functionality
+        function speakResult() {
+            if (!currentDiagnosisText) return;
+            
+            const speakBtn = document.getElementById('speakBtn');
+
+            // If it is reading, clicking the button a second time will toggle off/stop it
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                speakBtn.textContent = '🔊';
+                return;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(currentDiagnosisText);
+            
+            // Dynamically assign target locale engines
+            utterance.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            utterance.rate = 0.95; // Slightly measured pacing for clarity
+
+            speakBtn.textContent = '⏹️';
+
+            utterance.onend = () => {
+                speakBtn.textContent = '🔊';
+            };
+
+            utterance.onerror = () => {
+                speakBtn.textContent = '🔊';
+            };
+
+            window.speechSynthesis.speak(utterance);
         }
     </script>
 </body>
