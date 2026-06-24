@@ -14,6 +14,10 @@
   .lang-toggle{display:flex;background:rgba(255,255,255,0.15);border-radius:20px;overflow:hidden}
   .lang-btn{padding:6px 14px;border:none;background:transparent;color:white;cursor:pointer;font-size:13px;font-weight:600}
   .lang-btn.active{background:white;color:#2d5e2d;border-radius:20px}
+  
+  /* Active Session Sub-Navbar style */
+  .session-bar { background: #e8f5e9; padding: 10px 20px; text-align: right; font-size: 0.9rem; font-weight: 600; color: #1b441b; border-bottom: 1px solid #d0e2d0; }
+
   .container{max-width:500px;margin:20px auto;padding:0 20px}
   .input-row{display:flex;gap:10px;align-items:flex-start}
   textarea{flex:1;padding:14px;border:2px solid #2d5e2d;border-radius:8px;font-size:1rem;font-family:inherit;outline:none;min-height:90px;resize:vertical}
@@ -43,6 +47,10 @@
   </div>
 </header>
 
+<div class="session-bar">
+  👤 Farmer Profile: <span id="sessionUser" style="color: #2e7d32;">Checking...</span>
+</div>
+
 <div class="container">
   <div class="input-row">
     <textarea id="questionInput" placeholder="Type your farming question here..."></textarea>
@@ -64,6 +72,16 @@
 <script>
 let currentLang = 'en';
 let currentAnswer = '';
+
+// Read session dynamically from dashboard register credentials
+const currentFarmer = localStorage.getItem("farmer_username");
+if (!currentFarmer) {
+    window.location.replace("/static/register.html");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("sessionUser").textContent = currentFarmer;
+});
 
 const T = {
   en: {
@@ -123,7 +141,6 @@ function startMic() {
 }
 
 function cleanText(text) {
-  // Remove markdown bold/italic symbols for clean display + speech
   return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
 }
 
@@ -151,7 +168,8 @@ async function askQuestion() {
     const res = await fetch('/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: question, lang: currentLang })
+      // Pass username securely into the request context to write history metrics correctly
+      body: JSON.stringify({ username: currentFarmer, message: question, lang: currentLang })
     });
     const data = await res.json();
     loading.style.display = 'none';

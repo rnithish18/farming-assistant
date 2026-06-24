@@ -14,6 +14,10 @@
   .lang-toggle{display:flex;background:rgba(255,255,255,0.15);border-radius:20px;overflow:hidden}
   .lang-btn{padding:6px 14px;border:none;background:transparent;color:white;cursor:pointer;font-size:13px;font-weight:600}
   .lang-btn.active{background:white;color:#2d5e2d;border-radius:20px}
+  
+  /* User profile telemetry sub-bar */
+  .session-bar { background: #e8f5e9; padding: 10px 20px; text-align: right; font-size: 0.9rem; font-weight: 600; color: #1b441b; border-bottom: 1px solid #d0e2d0; }
+
   .container{max-width:500px;margin:20px auto;padding:0 20px}
   .input-group{margin-bottom:12px;display:flex;gap:10px}
   .input-group input{flex:1;padding:12px;border:2px solid #2d5e2d;border-radius:8px;font-size:1rem;font-family:inherit;outline:none}
@@ -43,6 +47,11 @@
     <button class="lang-btn" id="btn-ta" onclick="setLang('ta')">தமிழ்</button>
   </div>
 </header>
+
+<!-- Identity validation element header -->
+<div class="session-bar">
+  👤 Farmer Profile: <span id="sessionUser" style="color: #2e7d32;">Checking...</span>
+</div>
 
 <div class="container">
   <div class="input-group">
@@ -79,6 +88,16 @@
 <script>
 let currentLang = 'en';
 let currentResult = '';
+
+// Verification guard evaluating browser local session profiles
+const currentFarmer = localStorage.getItem("farmer_username");
+if (!currentFarmer) {
+    window.location.replace("/static/register.html");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("sessionUser").textContent = currentFarmer;
+});
 
 const T = {
   en: {
@@ -146,7 +165,8 @@ async function getSoilTips() {
   document.getElementById('errorBox').style.display = 'none';
   document.getElementById('resultCard').style.display = 'none';
   try {
-    const res = await fetch(`/soil?crop=${encodeURIComponent(crop)}&season=${encodeURIComponent(season)}&soil_type=${encodeURIComponent(soilType)}&lang=${currentLang}`);
+    // Forward the context identity variables to your active python background endpoints
+    const res = await fetch(`/soil?crop=${encodeURIComponent(crop)}&season=${encodeURIComponent(season)}&soil_type=${encodeURIComponent(soilType)}&lang=${currentLang}&username=${encodeURIComponent(currentFarmer)}`);
     const data = await res.json();
     document.getElementById('loading').style.display = 'none';
     if (data.error) {

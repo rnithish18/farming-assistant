@@ -14,6 +14,10 @@
         .lang-toggle { display: flex; background: rgba(255,255,255,0.15); border-radius: 20px; overflow: hidden; }
         .lang-btn { padding: 6px 14px; border: none; background: transparent; color: white; cursor: pointer; font-size: 13px; font-weight: 600; }
         .lang-btn.active { background: white; color: #2d5e2d; border-radius: 20px; }
+        
+        /* User session bar matching styling metrics */
+        .session-bar { background: #e8f5e9; padding: 10px 20px; text-align: right; font-size: 0.9rem; font-weight: 600; color: #1b441b; border-bottom: 1px solid #d0e2d0; }
+
         .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
         .upload-box { background: white; border: 2px dashed #2d5e2d; border-radius: 12px; padding: 30px 20px; text-align: center; cursor: pointer; }
         .upload-box p { margin-top: 10px; color: #555; font-size: 0.95rem; }
@@ -41,6 +45,10 @@
         </div>
     </header>
 
+    <div class="session-bar">
+        👤 Farmer Profile: <span id="sessionUser" style="color: #2e7d32;">Checking...</span>
+    </div>
+
     <div class="container">
         <div class="upload-box" onclick="document.getElementById('fileInput').click()">
             <div style="font-size: 2.5rem;">📸</div>
@@ -65,6 +73,16 @@
         let selectedFile = null;
         let currentLang = 'en';
         let currentDiagnosisText = '';
+
+        // Verification guard loop sequence targeting session sync
+        const currentFarmer = localStorage.getItem("farmer_username");
+        if (!currentFarmer) {
+            window.location.replace("/static/register.html");
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("sessionUser").textContent = currentFarmer;
+        });
 
         // UI Translation Text Matrix
         const T = {
@@ -142,6 +160,8 @@
 
             const formData = new FormData();
             formData.append('file', selectedFile);
+            // Append the tracked farmer's identity to let the backend index logs under the right account profile
+            formData.append('username', currentFarmer);
 
             try {
                 // Pass language preference as a query parameter match to main.py implementation

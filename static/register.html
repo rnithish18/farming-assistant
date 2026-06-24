@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farming AI Assistant - Registration</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f9f4; color: #1a3d1a; display: flex; flex-direction: column; min-height: 100vh; justify-content: center; align-items: center; }
+        
+        .registration-container {
+            background: #ffffff; 
+            width: 100%;
+            max-width: 500px; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08); 
+            border-top: 5px solid #2e7d32;
+        }
+        h3 { margin-top: 0; color: #2e7d32; border-bottom: 2px solid #e8f5e9; padding-bottom: 8px; margin-bottom: 20px; }
+        label { display:block; font-weight:bold; margin-bottom:5px; color:#333; font-size: 0.95rem; }
+        input, select { width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; background:white; font-size: 0.95rem; margin-bottom: 15px; }
+        input:focus, select:focus { border-color: #2e7d32; outline: none; }
+        
+        button { width:100%; background:#2e7d32; color:white; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-size: 1rem; transition: 0.2s; }
+        button:hover { background: #1b5e20; }
+        
+        #otp-form-step { background: #fff3e0; padding: 15px; border-radius: 8px; border-left: 4px solid #ff9800; margin-top: 10px; }
+        .hidden-element { display: none !important; }
+        #registration-status-msg { margin-top:15px; font-weight:bold; font-size:14px; text-align:center; }
+    </style>
+</head>
+<body>
+
+    <div class="registration-container">
+        <h3>📋 Farmer Registration Profile</h3>
+        
+        <div id="profile-form-step">
+            <div>
+                <label>Farmer Name / Identity:</label>
+                <input type="text" id="reg-username" value="Nithish">
+            </div>
+
+            <div>
+                <label>Access Mode Channel:</label>
+                <select id="auth-type" onchange="toggleFormFields()">
+                    <option value="guest">✨ Guest Account (Instant Access - No OTP)</option>
+                    <option value="phone">📱 Phone Verification (SMS OTP)</option>
+                    <option value="email">📧 Email Verification (Inbox OTP)</option>
+                </select>
+            </div>
+
+            <div id="phone-field-wrapper" class="hidden-element">
+                <label>Phone Number:</label>
+                <input type="text" id="reg-phone" placeholder="e.g., +919952348319">
+            </div>
+
+            <div id="email-field-wrapper" class="hidden-element">
+                <label>Email Address:</label>
+                <input type="email" id="reg-email" placeholder="farmer@example.com">
+            </div>
+
+            <div style="display: flex; gap: 15px;">
+                <div style="flex: 1;">
+                    <label>Age:</label>
+                    <input type="number" id="reg-age" value="23">
+                </div>
+                <div style="flex: 1;">
+                    <label>Gender:</label>
+                    <select id="reg-gender">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="submitFarmerProfile()">Initialize Account</button>
+        </div>
+
+        <div id="otp-form-step" class="hidden-element">
+            <p style="margin: 0 0 10px 0; color:#e65100; font-size:14px; font-weight:bold;">✉️ Code Sent! See your backend console output markdown logs.</p>
+            <label>Enter Security Token Code:</label>
+            <input type="text" id="verification-otp" placeholder="Enter 4-digit OTP">
+            <button onclick="verifyFarmerOTP()" style="background:#ff9800;">Confirm Identity</button>
+        </div>
+        
+        <p id="registration-status-msg"></p>
+    </div>
+
+    <script>
+        function toggleFormFields() {
+            const authType = document.getElementById("auth-type").value;
+            document.getElementById("phone-field-wrapper").classList.toggle("hidden-element", authType !== "phone");
+            document.getElementById("email-field-wrapper").classList.toggle("hidden-element", authType !== "email");
+        }
+
+        function submitFarmerProfile() {
+            const user = document.getElementById('reg-username').value.trim();
+            const authType = document.getElementById('auth-type').value;
+            const phone = document.getElementById('reg-phone').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const age = document.getElementById('reg-age').value;
+            const gender = document.getElementById('reg-gender').value;
+            const msg = document.getElementById('registration-status-msg');
+
+            if(!user || !age) {
+                msg.style.color = '#d32f2f';
+                msg.innerText = '❌ Please enter identity parameters completely!';
+                return;
+            }
+            if (authType === 'phone' && !phone) {
+                msg.style.color = '#d32f2f';
+                msg.innerText = '❌ Mobile phone number input parameter missing!';
+                return;
+            }
+            if (authType === 'email' && !email) {
+                msg.style.color = '#d32f2f';
+                msg.innerText = '❌ Electronic mail address input field missing!';
+                return;
+            }
+
+            msg.style.color = '#2e7d32';
+            msg.innerText = 'Connecting to backend environment...';
+
+            fetch('/register-profile', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    username: user, 
+                    auth_type: authType,
+                    phone_number: phone || null, 
+                    email: email || null,
+                    age: parseInt(age), 
+                    gender: gender 
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    window.currentRegisteringUser = user;
+                    if (authType === "guest") {
+                        msg.style.color = '#2e7d32';
+                        msg.innerText = '✅ Guest registration success! Access granted.';
+                        localStorage.setItem('farmer_username', user);
+                        setTimeout(() => { window.location.href = '/static/index.html'; }, 1000);
+                    } else {
+                        msg.style.color = '#2e7d32';
+                        msg.innerText = '✅ Profile registered. Please verify identity.';
+                        document.getElementById('otp-form-step').classList.remove('hidden-element');
+                    }
+                } else {
+                    msg.style.color = '#d32f2f';
+                    msg.innerText = '❌ Error: ' + data.message;
+                }
+            })
+            .catch(() => {
+                msg.style.color = '#d32f2f';
+                msg.innerText = '❌ Error: Backend offline or table migration missing.';
+            });
+        }
+
+        function verifyFarmerOTP() {
+            const otpVal = document.getElementById('verification-otp').value.trim();
+            const msg = document.getElementById('registration-status-msg');
+            const user = window.currentRegisteringUser || document.getElementById('reg-username').value.trim();
+
+            fetch('/verify-otp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username: user, otp: otpVal })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    msg.style.color = '#2e7d32';
+                    msg.innerText = '🎉 Verification Success! Redirecting to features...';
+                    localStorage.setItem('farmer_username', user);
+                    setTimeout(() => { window.location.href = '/static/index.html'; }, 1200);
+                } else {
+                    msg.style.color = '#d32f2f';
+                    msg.innerText = '❌ ' + data.message;
+                }
+            });
+        }
+    </script>
+</body>
+</html>

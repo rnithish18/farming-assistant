@@ -3,97 +3,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Farming Assistant</title>
+    <title>Farming AI Assistant - Dashboard</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f7f0;
-            color: #1a3d1a;
-        }
-        header {
-            background-color: #2d5e2d;
-            color: white;
-            padding: 20px;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f9f4; color: #1a3d1a; }
+        
+        header { 
+            background: linear-gradient(135deg, #2d5e2d, #1b441b); 
+            color: white; 
+            padding: 25px 20px; 
             text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        header h1 {
-            font-size: 1.8rem;
-        }
-        .container {
-            max-width: 500px;
-            margin: 30px auto;
-            padding: 0 20px;
-        }
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            text-decoration: none;
-            color: #1a3d1a;
-            display: block;
+        header h1 { font-size: 1.8rem; margin-bottom: 5px; }
+        header p { font-size: 0.95rem; opacity: 0.9; }
+
+        .profile-bar {
+            background: #e8f5e9;
+            padding: 12px;
             text-align: center;
+            border-bottom: 1px solid #d0e2d0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
         }
-        .card h2 {
-            font-size: 1.3rem;
-            margin-bottom: 8px;
+        .profile-bar span { font-weight: 600; color: #1b441b; }
+        .logout-btn { padding: 6px 12px; background: #c62828; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
+        .logout-btn:hover { background: #b71c1c; }
+
+        .container { max-width: 800px; margin: 30px auto; padding: 0 20px; }
+        
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+            gap: 20px; 
         }
-        .card p {
-            font-size: 0.95rem;
-            color: #555;
+
+        .card { 
+            background: white; 
+            border-radius: 16px; 
+            padding: 20px; 
+            text-align: center; 
+            text-decoration: none; 
+            color: #1a3d1a;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e1ebe1;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
-        .icon {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
+        .card:hover { 
+            transform: translateY(-4px); 
+            box-shadow: 0 8px 20px rgba(45, 94, 45, 0.12);
+            border-color: #2d5e2d;
         }
+        .card .icon { font-size: 2.5rem; margin-bottom: 12px; }
+        .card h3 { font-size: 1.15rem; margin-bottom: 6px; font-weight: 600; }
+        .card p { font-size: 0.85rem; color: #556b55; line-height: 1.4; }
+
+        .history-section { background: white; padding: 20px; border-radius: 16px; margin-top: 30px; border: 1px solid #e1ebe1; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04); }
+        .history-item { padding: 10px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        .history-item:last-child { border-bottom: none; }
+        .history-tag { background: #e8f5e9; color: #2d5e2d; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.75rem; margin-right: 8px; text-transform: uppercase; }
+
+        footer { text-align: center; margin-top: 40px; font-size: 0.85rem; color: #778b77; padding-bottom: 25px; }
     </style>
 </head>
 <body>
+
     <header>
-        <h1>🌾 Farming Assistant</h1>
+        <h1 id="welcomeTitle">🌾 Farming AI Assistant</h1>
+        <p>Your intelligent companion for smarter, high-yield farming</p>
     </header>
-    <div class="container">
-        <a href="/static/chat.html" class="card">
-            <div class="icon">💬</div>
-            <h2>Ask a Question</h2>
-            <p>Get farming advice in simple language</p>
-        </a>
-        <a href="/static/diagnose.html" class="card">
-            <div class="icon">📷</div>
-            <h2>Check Plant Disease</h2>
-            <p>Upload a photo of your crop to diagnose problems</p>
-        </a>
-        <a href="/static/weather.html" class="card">
-            <div class="icon">☀️</div>
-            <h2>Weather</h2>
-            <p>Check today's weather for your area</p>
-        </a>
-        <a href="/static/forecast.html" class="card">
-            <div class="icon">🌧️</div>
-            <h2>Rain Forecast</h2>
-            <p>7-day rain prediction with farming advice</p>
-        </a>
-        <a href="/static/market.html" class="card">
-            <div class="icon">📊</div>
-            <h2>Market Prices</h2>
-            <p>Check crop prices at your nearest mandi</p>
-        </a>
-        <a href="/static/soil.html" class="card">
-            <div class="icon">🌱</div>
-            <h2>Soil Tips</h2>
-            <p>Get crop and soil advice by season</p>
-        </a>
-        <a href="/static/pest.html" class="card">
-            <div class="icon">🐛</div>
-            <h2>Pest Alert</h2>
-            <p>Check common pests in your region this season</p>
-        </a>
+
+    <div class="profile-bar">
+        <span id="activeUserLabel">Active Profile: Loading...</span>
+        <button class="logout-btn" onclick="logOutSession()">Switch Profile / Logout</button>
     </div>
+
+    <div class="container">
+        <div class="grid">
+            <a href="/static/chat.html" class="card">
+                <div class="icon">💬</div>
+                <h3>Ask a Question</h3>
+                <p>Chat with AI assistant in English or தமிழ் via text or voice.</p>
+            </a>
+
+            <a href="/static/diagnose.html" class="card">
+                <div class="icon">📸</div>
+                <h3>Crop Diagnosis</h3>
+                <p>Take or upload leaf photos to instantly find plant diseases.</p>
+            </a>
+
+            <a href="/static/weather.html" class="card">
+                <div class="icon">☀️</div>
+                <h3>Live Weather</h3>
+                <p>Check temperature, humidity, and real-time smart farming tips.</p>
+            </a>
+
+            <a href="/static/forecast.html" class="card">
+                <div class="icon">🌧️</div>
+                <h3>Rain Forecast</h3>
+                <p>Track a 7-day outlook to safely time sprays and irrigation.</p>
+            </a>
+
+            <a href="/static/market.html" class="card">
+                <div class="icon">📊</div>
+                <h3>Market Prices</h3>
+                <p>See accurate market wholesale rates and selling trends.</p>
+            </a>
+
+            <a href="/static/soil.html" class="card">
+                <div class="icon">🌱</div>
+                <h3>Soil Advisory</h3>
+                <p>Get custom land prep steps and fertilization guides.</p>
+            </a>
+
+            <a href="/static/pest.html" class="card">
+                <div class="icon">🐛</div>
+                <h3>Pest Alerts</h3>
+                <p>Identify active risks and explore organic or chemical fixes.</p>
+            </a>
+
+            <a href="/static/schemes.html" class="card">
+                <div class="icon">📋</div>
+                <h3>Govt Schemes</h3>
+                <p>Explore central/state farming benefits, loans, and subsidies.</p>
+            </a>
+        </div>
+
+        <div class="history-section">
+            <h3 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">🕒 Recent Activity Logs</h3>
+            <div id="historyLogs" style="color: #666; font-size: 0.9rem;">Fetching logs...</div>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2026 Farming AI Assistant • Designed for Indian Agriculture</p>
+    </footer>
+
+    <script>
+        // Security Gatekeeper Check: Ensure session state exists before rendering
+        const savedUser = localStorage.getItem("farmer_username");
+        if (!savedUser) {
+            window.location.replace("/static/register.html");
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            if (savedUser) {
+                document.getElementById("welcomeTitle").textContent = `🌾 Welcome back, ${savedUser}!`;
+                document.getElementById("activeUserLabel").textContent = `👤 Active Farmer: ${savedUser}`;
+                loadHistory(savedUser);
+            }
+        });
+
+        function logOutSession() {
+            localStorage.removeItem("farmer_username");
+            window.location.href = "/static/register.html";
+        }
+
+        async function loadHistory(name) {
+            const container = document.getElementById("historyLogs");
+            try {
+                const response = await fetch(`/get-logs?username=${encodeURIComponent(name)}`);
+                const data = await response.json();
+                
+                if (data.history && data.history.length > 0) {
+                    container.innerHTML = data.history.map(item => `
+                        <div class="history-item">
+                            <div>
+                                <span class="history-tag">${item.feature}</span> 
+                                <span>${item.query}</span>
+                            </div>
+                            <span style="color: #778b77; font-size: 0.8rem;">${item.time}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    container.textContent = "No dashboard activities recorded under this profile yet.";
+                }
+            } catch (err) {
+                container.textContent = "Could not fetch activity metrics from database.";
+            }
+        }
+    </script>
 </body>
 </html>

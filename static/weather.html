@@ -14,6 +14,10 @@
   .lang-toggle{display:flex;background:rgba(255,255,255,0.15);border-radius:20px;overflow:hidden}
   .lang-btn{padding:6px 14px;border:none;background:transparent;color:white;cursor:pointer;font-size:13px;font-weight:600}
   .lang-btn.active{background:white;color:#2d5e2d;border-radius:20px}
+  
+  /* User profile bar matching chat layout */
+  .session-bar { background: #e8f5e9; padding: 10px 20px; text-align: right; font-size: 0.9rem; font-weight: 600; color: #1b441b; border-bottom: 1px solid #d0e2d0; }
+
   .container{max-width:500px;margin:20px auto;padding:0 20px}
   .search-box{display:flex;gap:10px}
   input{flex:1;padding:12px;border:2px solid #2d5e2d;border-radius:8px;font-size:1rem;font-family:inherit;outline:none}
@@ -50,6 +54,10 @@
     <button class="lang-btn" id="btn-ta" onclick="setLang('ta')">தமிழ்</button>
   </div>
 </header>
+
+<div class="session-bar">
+  👤 Farmer Profile: <span id="sessionUser" style="color: #2e7d32;">Checking...</span>
+</div>
 
 <div class="container">
   <div class="search-box">
@@ -88,6 +96,16 @@
 <script>
 let currentLang = 'en';
 let currentTip = '';
+
+// Active browser storage validation block
+const currentFarmer = localStorage.getItem("farmer_username");
+if (!currentFarmer) {
+    window.location.replace("/static/register.html");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("sessionUser").textContent = currentFarmer;
+});
 
 const T = {
   en: {
@@ -140,7 +158,6 @@ function startMic() {
     return;
   }
   const recognition = new SpeechRecognition();
-  // Always use English for city name — OpenWeatherMap needs English
   recognition.lang = 'en-IN';
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
@@ -160,17 +177,10 @@ function startMic() {
     micBtn.classList.remove('listening');
     micBtn.textContent = '🎤';
     input.placeholder = T[currentLang].placeholder;
-    // Auto search after voice input
     getWeather();
   };
 
-  recognition.onerror = () => {
-    micBtn.classList.remove('listening');
-    micBtn.textContent = '🎤';
-    input.placeholder = T[currentLang].placeholder;
-  };
-
-  recognition.onend = () => {
+  recognition.onerror = recognition.onend = () => {
     micBtn.classList.remove('listening');
     micBtn.textContent = '🎤';
     input.placeholder = T[currentLang].placeholder;
@@ -194,7 +204,8 @@ async function getWeather() {
   farmingTip.style.display = 'none';
 
   try {
-    const res = await fetch(`/weather?city=${encodeURIComponent(city)}&lang=${currentLang}`);
+    // Included username parameter dynamically to lock log entries correctly to the actual active user
+    const res = await fetch(`/weather?city=${encodeURIComponent(city)}&lang=${currentLang}&username=${encodeURIComponent(currentFarmer)}`);
     const data = await res.json();
     const t = T[currentLang];
 

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Government Schemes - Farming Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background-color: #f0f7f0; color: #1a3d1a; }
+        header { background-color: #2d5e2d; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        header a { color: white; text-decoration: none; font-size: 1.5rem; }
+        header h1 { font-size: 1.3rem; }
+        .lang-toggle { display: flex; background: rgba(255,255,255,0.15); border-radius: 20px; overflow: hidden; }
+        .lang-btn { padding: 6px 14px; border: none; background: transparent; color: white; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .lang-btn.active { background: white; color: #2d5e2d; border-radius: 20px; }
+        
+        /* User profile session tracking banner styling */
+        .session-bar { background: #e8f5e9; padding: 10px 20px; text-align: right; font-size: 0.9rem; font-weight: 600; color: #1b441b; border-bottom: 1px solid #d0e2d0; }
+
+        .container { max-width: 600px; margin: 20px auto; padding: 0 20px; }
+        .form-panel { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem; }
+        select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; background-color: #fafafa; }
+        button.action-btn { width: 100%; padding: 14px; background-color: #2d5e2d; color: white; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        button.action-btn:disabled { background-color: #999; }
+        .loading { text-align: center; margin-top: 20px; color: #555; display: none; }
+        .answer-box { background: white; border-radius: 12px; padding: 20px; margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none; }
+        .answer-text { white-space: pre-wrap; line-height: 1.6; font-size: 0.95rem; color: #1a3d1a; margin-bottom: 15px; }
+        .answer-footer { display: flex; justify-content: flex-end; border-top: 1px solid #eee; padding-top: 10px; }
+        .speak-btn { background: #e8f5e9; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <a href="/static/index.html">←</a>
+            <h1 id="h-title">📋 Government Schemes</h1>
+        </div>
+        <div class="lang-toggle">
+            <button class="lang-btn active" id="btn-en" onclick="setLang('en')">EN</button>
+            <button class="lang-btn" id="btn-ta" onclick="setLang('ta')">தமிழ்</button>
+        </div>
+    </header>
+
+    <div class="session-bar">
+        👤 Farmer Profile: <span id="sessionUser" style="color: #2e7d32;">Checking...</span>
+    </div>
+
+    <div class="container">
+        <div class="form-panel">
+            <div class="form-group">
+                <label id="lbl-state">Select State</label>
+                <select id="stateInput">
+                    <option value="Tamil Nadu">Tamil Nadu</option>
+                    <option value="Andhra Pradesh">Andhra Pradesh</option>
+                    <option value="Karnataka">Karnataka</option>
+                    <option value="Kerala">Kerala</option>
+                    <option value="Maharashtra">Maharashtra</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label id="lbl-cat">Scheme Type / Category</label>
+                <select id="categoryInput">
+                    <option value="All">All Schemes</option>
+                    <option value="Subsidy">Subsidies & Machinery</option>
+                    <option value="Financial Aid">Direct Income Support</option>
+                    <option value="Insurance">Crop Insurance</option>
+                </select>
+            </div>
+            <button id="searchButton" class="action-btn" onclick="fetchSchemes()">Find Schemes</button>
+        </div>
+
+        <div class="loading" id="loading">Searching verified schemes...</div>
+
+        <div class="answer-box" id="answerBox">
+            <div class="answer-text" id="answerText"></div>
+            <div class="answer-footer">
+                <button class="speak-btn" id="speakBtn" onclick="toggleSpeech()" title="Read aloud">🔊</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let rawResponseText = '';
+
+        // Verification guard evaluating browser local session profiles
+        const currentFarmer = localStorage.getItem("farmer_username");
+        if (!currentFarmer) {
+            window.location.replace("/static/register.html");
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("sessionUser").textContent = currentFarmer;
+        });
+
+        const T = {
+            en: {
+                title: '📋 Government Schemes',
+                lblState: 'Select State',
+                lblCat: 'Scheme Type / Category',
+                btnSearch: 'Find Schemes',
+                loading: 'Searching verified schemes...',
+                error: 'Could not connect to the assistant server.'
+            },
+            ta: {
+                title: '📋 அரசு திட்டங்கள்',
+                lblState: 'மாநிலத்தைத் தேர்ந்தெடுக்கவும்',
+                lblCat: 'திட்டத்தின் வகை',
+                btnSearch: 'திட்டங்களைத் தேடு',
+                loading: 'அரசு திட்டங்களைத் தேடுகிறோம்...',
+                error: 'சேவையகத்தை அணுக முடியவில்லை.'
+            }
+        };
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+            document.getElementById('btn-ta').classList.toggle('active', lang === 'ta');
+            
+            document.getElementById('h-title').textContent = T[lang].title;
+            document.getElementById('lbl-state').textContent = T[lang].lblState;
+            document.getElementById('lbl-cat').textContent = T[lang].lblCat;
+            document.getElementById('searchButton').textContent = T[lang].btnSearch;
+            document.getElementById('loading').textContent = T[lang].loading;
+
+            window.speechSynthesis.cancel();
+            document.getElementById('speakBtn').textContent = '🔊';
+        }
+
+        function cleanText(text) {
+            return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+        }
+
+        async function fetchSchemes() {
+            const state = document.getElementById('stateInput').value;
+            const category = document.getElementById('categoryInput').value;
+            const button = document.getElementById('searchButton');
+            const loading = document.getElementById('loading');
+            const answerBox = document.getElementById('answerBox');
+            const answerText = document.getElementById('answerText');
+
+            window.speechSynthesis.cancel();
+            document.getElementById('speakBtn').textContent = '🔊';
+
+            button.disabled = true;
+            loading.style.display = 'block';
+            answerBox.style.display = 'none';
+
+            try {
+                // Append current telemetry parameters down to backend communication routes cleanly
+                const response = await fetch(`/schemes?state=${encodeURIComponent(state)}&category=${encodeURIComponent(category)}&lang=${currentLang}&username=${encodeURIComponent(currentFarmer)}`);
+                const data = await response.json();
+                
+                rawResponseText = cleanText(data.schemes || data.detail || JSON.stringify(data));
+                answerText.textContent = rawResponseText;
+                answerBox.style.display = 'block';
+
+                // Send activity tracking log back to the SQLite server
+                fetch("/save-log", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        username: currentFarmer,
+                        feature_type: "Govt Schemes",
+                        query_details: `State: ${state} | Category: ${category}`
+                    })
+                }).catch((e) => console.log("Logging failed:", e));
+
+            } catch (err) {
+                answerText.textContent = T[currentLang].error;
+                answerBox.style.display = 'block';
+            } finally {
+                button.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        function toggleSpeech() {
+            if (!rawResponseText) return;
+            const speakBtn = document.getElementById('speakBtn');
+
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                speakBtn.textContent = '🔊';
+                return;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(rawResponseText);
+            utterance.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            utterance.rate = 0.95;
+
+            speakBtn.textContent = '⏹️';
+            utterance.onend = () => speakBtn.textContent = '🔊';
+            utterance.onerror = () => speakBtn.textContent = '🔊';
+
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>
