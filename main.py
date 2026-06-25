@@ -7,6 +7,11 @@ from groq import Groq
 import base64
 import os
 import re
+import smtplib
+import random
+import time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 import requests
 import sqlite3
@@ -14,61 +19,44 @@ import sqlite3
 load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+otp_store = {}
 
-app = FastAPI(title="Farming AI Assistant - Multi-Channel Core")
+app = FastAPI(title="Farming AI Assistant")
 
 def strip_think_tags(text: str) -> str:
     return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
-
-
-# --- PYDANTIC MODEL SCHEMAS ---
 
 class ChatRequest(BaseModel):
     message: str
     lang: str = "en"
     username: str = "Anonymous"
 
-
 class LogRequest(BaseModel):
     username: str
     feature_type: str
     query_details: str
 
-
-# Upgraded schema to support flexible multi-channel profiles without 422 parsing structural exceptions
 class ProfileRequest(BaseModel):
     username: str
-    auth_type: str  # Supports: "guest", "phone", "email"
+    auth_type: str
     phone_number: Optional[str] = None
     email: Optional[str] = None
     age: int
     gender: str
 
-
-class OTPVerifyRequest(BaseModel):
-    username: str
-    otp: str
-
-
-# --- SILENT HANDLERS FOR CLEAN TERMINAL LOGS ---
-
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     return Response(status_code=204)
-
 
 @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
 def chrome_devtools_silent_handler():
     return Response(status_code=204)
 
-
-# --- DATABASE LIFECYCLE MANAGEMENT ---
-
 def init_db():
     conn = sqlite3.connect("farming_assistant.db")
     cursor = conn.cursor()
-    
-    # Activity logs table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS activity_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,152 +66,123 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    
-    # Farmer profiles verification table (Updated with multi-channel and tracking logic)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS farmer_profiles (
             username TEXT PRIMARY KEY,
-            auth_type TEXT NOT NULL DEFAULT 'phone',
+            auth_type TEXT NOT NULL DEFAULT 'guest',
             phone_number TEXT,
             email TEXT,
             age INTEGER NOT NULL,
             gender TEXT NOT NULL,
             is_otp_verified INTEGER DEFAULT 0,
-            mock_otp TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    
     conn.commit()
     conn.close()
 
-# Initialize database tables on spin up
 init_db()
 
-
-# --- INTERCEPTOR LOGIC VERIFICATION SECURITY GUARDS ---
-
-def is_profile_verified(username: str) -> bool:
+def save_log(username: str, feature_type: str, details: str):
     try:
         conn = sqlite3.connect("farming_assistant.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT is_otp_verified FROM farmer_profiles WHERE username = ?", (username,))
-        row = cursor.fetchone()
+        cursor.execute(
+            "INSERT INTO activity_logs (username, feature_type, query_details) VALUES (?, ?, ?)",
+            (username, feature_type, details)
+        )
+        conn.commit()
         conn.close()
-        if row and row[0] == 1:
-            return True
-    except Exception:
-        pass
-    return False
+    except Exception as e:
+        print(f"Logging error: {e}")
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon2():
+    return Response(status_code=204)
+
+# --- OTP ENDPOINTS ---
+
+@app.post("/send-otp")
+def send_otp(data: dict):
+    email = data.get("email", "").strip()
+    name = data.get("name", "").strip()
+    if not email or "@" not in email:
+        return {"success": False, "message": "Invalid email address"}
+    otp = str(random.randint(100000, 999999))
+    otp_store[email] = {"otp": otp, "time": time.time(), "name": name}
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"{otp} is your Farming Assistant OTP"
+        msg["From"] = GMAIL_ADDRESS
+        msg["To"] = email
+        html = f"""
+        <div style="font-family:Arial,sans-serif;max-width:400px;margin:auto;
+                    background:#f0f7f0;border-radius:12px;padding:30px;text-align:center">
+            <h2 style="color:#2d5e2d">🌾 Farming Assistant</h2>
+            <p style="color:#333">Hello <b>{name}</b>! Your verification code is:</p>
+            <div style="font-size:2.5rem;font-weight:bold;color:#2d5e2d;
+                        background:white;border-radius:8px;padding:20px;margin:20px 0;
+                        letter-spacing:8px">{otp}</div>
+            <p style="color:#666;font-size:0.9rem">This code expires in 10 minutes.</p>
+            <p style="color:#999;font-size:0.8rem">Do not share this code with anyone.</p>
+        </div>
+        """
+        msg.attach(MIMEText(html, "html"))
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+            server.sendmail(GMAIL_ADDRESS, email, msg.as_string())
+        return {"success": True, "message": "OTP sent successfully"}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
 
 
-def save_verified_log(username: str, feature_type: str, details: str):
-    if is_profile_verified(username):
-        try:
-            conn = sqlite3.connect("farming_assistant.db")
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO activity_logs (username, feature_type, query_details) VALUES (?, ?, ?)",
-                (username, feature_type, details)
-            )
-            conn.commit()
-            conn.close()
-            print(f"Log successfully recorded for verified user: {username}")
-        except Exception as e:
-            print(f"Logging error: {e}")
-    else:
-        print(f"Log blocked: User {username} has not verified their profile yet.")
+@app.post("/verify-otp")
+def verify_otp(data: dict):
+    email = data.get("email", "").strip()
+    otp = data.get("otp", "").strip()
+    if not email or email not in otp_store:
+        return {"success": False, "message": "No OTP found. Please request a new one."}
+    stored = otp_store[email]
+    if time.time() - stored["time"] > 600:
+        del otp_store[email]
+        return {"success": False, "message": "OTP expired. Please request a new one."}
+    if stored["otp"] != otp:
+        return {"success": False, "message": "Incorrect OTP. Please try again."}
+    name = stored["name"]
+    del otp_store[email]
+    return {"success": True, "message": "Verified successfully", "name": name}
 
 
-# --- PROFILE REGISTRATION AND OTP ENDPOINTS ---
+# --- REGISTER (kept for guest support) ---
 
 @app.post("/register-profile")
 def register_profile(request: ProfileRequest):
     try:
         username_clean = request.username.strip()
         if not username_clean:
-            return {"status": "error", "message": "Username parameter cannot be empty."}
-
-        # Guest accounts skip the OTP verification state step entirely
+            return {"status": "error", "message": "Username cannot be empty."}
         is_verified = 1 if request.auth_type == "guest" else 0
-        
-        # Branch sandbox security code values dynamically depending on requested access track
-        if request.auth_type == "phone":
-            simulated_otp = "1234"
-        elif request.auth_type == "email":
-            simulated_otp = "5678"
-        else:
-            simulated_otp = ""  # Guest account gets no verification token
-
         conn = sqlite3.connect("farming_assistant.db")
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT OR REPLACE INTO farmer_profiles 
-            (username, auth_type, phone_number, email, age, gender, is_otp_verified, mock_otp) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (username_clean, request.auth_type, request.phone_number, request.email, request.age, request.gender, is_verified, simulated_otp))
+            INSERT OR REPLACE INTO farmer_profiles
+            (username, auth_type, phone_number, email, age, gender, is_otp_verified)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (username_clean, request.auth_type, request.phone_number,
+              request.email, request.age, request.gender, is_verified))
         conn.commit()
         conn.close()
-        
-        # Display explicit validation strings in local terminal window for developers
-        if request.auth_type != "guest":
-            print("\n" + "="*60)
-            print(f"🔑 SECURITY SANDBOX VERIFICATION MONITOR")
-            print(f"Target Identity User: {username_clean} via [{request.auth_type.upper()}]")
-            print(f"PASSCODE VALUE TO SUBMIT FRONTEND: {simulated_otp}")
-            print("="*60 + "\n")
-
-        if request.auth_type == "guest":
-            return {"status": "success", "message": f"Guest Profile Active! Welcome {username_clean}."}
-        elif request.auth_type == "email":
-            return {"status": "success", "message": "Profile initialized. Check sandbox console for email token entry.", "mock_otp": "5678"}
-        else:
-            return {"status": "success", "message": "Profile initialized. Check sandbox console for SMS OTP code.", "mock_otp": "1234"}
-            
+        return {"status": "success", "message": f"Welcome {username_clean}!"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
-@app.post("/verify-otp")
-def verify_otp(request: OTPVerifyRequest):
-    try:
-        username_clean = request.username.strip()
-        conn = sqlite3.connect("farming_assistant.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT mock_otp FROM farmer_profiles WHERE username = ?", (username_clean,))
-        row = cursor.fetchone()
-        
-        if not row:
-            conn.close()
-            return {"status": "error", "message": "Profile not detected. Please register account info first."}
-            
-        stored_otp = row[0]
-        
-        if request.otp == stored_otp:
-            cursor.execute("UPDATE farmer_profiles SET is_otp_verified = 1 WHERE username = ?", (username_clean,))
-            conn.commit()
-            conn.close()
-            return {"status": "success", "message": "Identity validation step approved successfully!"}
-        else:
-            conn.close()
-            return {"status": "error", "message": "Invalid code token sequence entered. Re-check sandbox environment hint values."}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-# --- TELEMETRY TRACKING API ENDPOINTS ---
+# --- LOGS ---
 
 @app.post("/save-log")
 def save_user_log(request: LogRequest):
     try:
-        conn = sqlite3.connect("farming_assistant.db")
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO activity_logs (username, feature_type, query_details) VALUES (?, ?, ?)",
-            (request.username, request.feature_type, request.query_details)
-        )
-        conn.commit()
-        conn.close()
+        save_log(request.username, request.feature_type, request.query_details)
         return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -240,21 +199,18 @@ def get_user_logs(username: str):
         )
         rows = cursor.fetchall()
         conn.close()
-        
         history = [{"feature": r[0], "query": r[1], "time": r[2]} for r in rows]
         return {"history": history}
     except Exception as e:
         return {"error": str(e)}
 
 
-# --- CORE ASSISTANT ROUTING MATCHES ---
+# --- PAGE ROUTES ---
 
 @app.get("/", response_class=HTMLResponse)
-@app.get("/index.html", response_class=HTMLResponse)
 def read_root():
     return FileResponse("static/index.html")
 
-# Static Multi-Page Module Router Layers
 @app.get("/chat.html", response_class=HTMLResponse)
 def serve_chat_page(): return FileResponse("static/chat.html")
 
@@ -280,6 +236,8 @@ def serve_pest_page(): return FileResponse("static/pest.html")
 def serve_schemes_page(): return FileResponse("static/schemes.html")
 
 
+# --- CHAT ---
+
 @app.post("/chat")
 def chat(request: ChatRequest):
     if request.lang == "ta":
@@ -293,7 +251,6 @@ def chat(request: ChatRequest):
             "You are a helpful farming assistant for farmers in India. "
             "Answer questions simply and practically in English only. Avoid technical jargon."
         )
-
     response = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
@@ -302,34 +259,31 @@ def chat(request: ChatRequest):
         ],
         max_tokens=1024
     )
-    
     reply = strip_think_tags(response.choices[0].message.content)
-    save_verified_log(request.username, "AI Chatbot", f"Asked: {request.message[:40]}...")
+    save_log(request.username, "AI Chatbot", f"Asked: {request.message[:40]}...")
     return {"reply": reply}
 
 
+# --- DIAGNOSE ---
+
 @app.post("/diagnose")
-async def diagnose(file: UploadFile = File(...), lang: str = "en", username: str = "Nithish"):
+async def diagnose(file: UploadFile = File(...), lang: str = "en", username: str = "Anonymous"):
     image_bytes = await file.read()
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-
     if lang == "ta":
         prompt_text = (
             "நீங்கள் இந்திய விவசாயிகளுக்கு உதவும் ஒரு நிபுணர் வேளாண் உதவியாளர். "
             "இந்த பயிர் அல்லது தாவர இலையின் புகைப்படத்தை பார்த்து தமிழில் மட்டும் பதிலளிக்கவும். "
-            "கண்டறியவும்: 1. நோய் அல்லது பூச்சி பிரச்சனை என்னவென்று 2. எவ்வளவு தீவிரமாக உள்ளது "
-            "3. உள்ளூரில் கிடைக்கும் மலிவான முறைகளில் எளிய சிகிச்சை படிகள். "
-            "எளிமையாகவும் தொழில்நுட்ப வார்த்தைகள் இல்லாமலும் எழுதவும்."
+            "கண்டறியவும்: 1. நோய் அல்லது பூச்சி பிரச்சனை 2. எவ்வளவு தீவிரம் "
+            "3. உள்ளூரில் கிடைக்கும் மலிவான முறைகளில் எளிய சிகிச்சை படிகள்."
         )
     else:
         prompt_text = (
             "You are an expert agricultural assistant helping Indian farmers. "
             "Look at this photo of a crop or plant leaf and respond in English only. "
-            "Identify: 1. The likely disease or pest problem if any 2. How serious it looks "
-            "3. Simple practical treatment steps using affordable locally available methods. "
-            "Keep it simple and avoid technical jargon."
+            "Identify: 1. The likely disease or pest problem 2. How serious it looks "
+            "3. Simple practical treatment steps using affordable locally available methods."
         )
-
     response = groq_client.chat.completions.create(
         model="meta-llama/llama-4-scout-17b-16e-instruct",
         messages=[
@@ -343,24 +297,23 @@ async def diagnose(file: UploadFile = File(...), lang: str = "en", username: str
         ],
         max_tokens=1024
     )
-    
     diagnosis = strip_think_tags(response.choices[0].message.content)
-    save_verified_log(username, "Crop Diagnosis", f"Uploaded plant health image: {file.filename}")
+    save_log(username, "Crop Diagnosis", f"Uploaded image: {file.filename}")
     return {"diagnosis": diagnosis}
 
 
+# --- WEATHER ---
+
 @app.get("/weather")
-def get_weather(city: str, lang: str = "en", username: str = "Nithish"):
+def get_weather(city: str, lang: str = "en", username: str = "Anonymous"):
     url = "https://api.openweathermap.org/data/2.5/weather"
     params = {"q": city, "appid": OPENWEATHER_API_KEY, "units": "metric"}
     response = requests.get(url, params=params)
     data = response.json()
     if response.status_code != 200:
         return {"error": data.get("message", "Could not fetch weather")}
-
     temp = data["main"]["temp"]
     humidity = data["main"]["humidity"]
-
     if lang == "ta":
         if temp > 38:
             tip = "மிகவும் சூடான நாள் — காலையிலோ மாலையிலோ பயிர்களுக்கு தண்ணீர் பாய்ச்சவும்."
@@ -375,9 +328,7 @@ def get_weather(city: str, lang: str = "en", username: str = "Nithish"):
             tip = "High humidity — watch for fungal diseases on leaves."
         else:
             tip = "Good farming conditions — suitable for field work."
-
-    save_verified_log(username, "Live Weather", f"Checked weather parameters for {data['name']}")
-
+    save_log(username, "Live Weather", f"Checked weather for {data['name']}")
     return {
         "city": data["name"],
         "temperature": temp,
@@ -389,15 +340,16 @@ def get_weather(city: str, lang: str = "en", username: str = "Nithish"):
     }
 
 
+# --- FORECAST ---
+
 @app.get("/forecast")
-def get_forecast(city: str, lang: str = "en", username: str = "Nithish"):
+def get_forecast(city: str, lang: str = "en", username: str = "Anonymous"):
     url = "https://api.openweathermap.org/data/2.5/forecast"
     params = {"q": city, "appid": OPENWEATHER_API_KEY, "units": "metric", "cnt": 40}
     response = requests.get(url, params=params)
     data = response.json()
     if response.status_code != 200:
         return {"error": data.get("message", "Could not fetch forecast")}
-
     days = {}
     for item in data["list"]:
         date = item["dt_txt"].split(" ")[0]
@@ -408,21 +360,19 @@ def get_forecast(city: str, lang: str = "en", username: str = "Nithish"):
         days[date]["humidity"].append(item["main"]["humidity"])
         if "rain" in item:
             days[date]["rain"] += item["rain"].get("3h", 0)
-
     forecast = []
     for date, info in list(days.items())[:7]:
         avg_temp = round(sum(info["temps"]) / len(info["temps"]), 1)
         avg_humidity = round(sum(info["humidity"]) / len(info["humidity"]))
         most_common_desc = max(set(info["descriptions"]), key=info["descriptions"].count)
         rain_mm = round(info["rain"], 1)
-
         if lang == "ta":
             if rain_mm > 10:
                 advice = "கனமழை எதிர்பார்க்கப்படுகிறது — பூச்சிக்கொல்லி அல்லது உரம் தெளிக்க வேண்டாம்."
             elif rain_mm > 2:
-                advice = "லேசான மழை எதிர்பார்க்கப்படுகிறது — பயிர்களுக்கு நல்லது, நீர்பாசனம் நிறுத்தவும்."
+                advice = "லேசான மழை எதிர்பார்க்கப்படுகிறது — பயிர்களுக்கு நல்லது."
             elif avg_temp > 38:
-                advice = "மிகவும் சூடான நாள் — காலையிலோ மாலையிலோ பயிர்களுக்கு தண்ணீர் பாய்ச்சவும்."
+                advice = "மிகவும் சூடான நாள் — காலையிலோ மாலையிலோ தண்ணீர் பாய்ச்சவும்."
             elif avg_humidity > 80:
                 advice = "அதிக ஈரப்பதம் — இலைகளில் பூஞ்சை நோய்களை கவனிக்கவும்."
             else:
@@ -438,7 +388,6 @@ def get_forecast(city: str, lang: str = "en", username: str = "Nithish"):
                 advice = "High humidity — watch for fungal diseases on leaves."
             else:
                 advice = "Good farming conditions — suitable for field work."
-
         forecast.append({
             "date": date,
             "avg_temp": avg_temp,
@@ -447,20 +396,44 @@ def get_forecast(city: str, lang: str = "en", username: str = "Nithish"):
             "rain_mm": rain_mm,
             "farming_advice": advice
         })
-
-    save_verified_log(username, "Weather Forecast", f"Looked up a 7-day outlook for {data['city']['name']}")
+    save_log(username, "Weather Forecast", f"7-day forecast for {data['city']['name']}")
     return {"city": data["city"]["name"], "forecast": forecast}
 
 
-@app.get("/market")
-def get_market_prices(crop: str, state: str = "Tamil Nadu", lang: str = "en", username: str = "Nithish"):
-    if lang == "ta":
-        prompt = f"""நீங்கள் இந்தியாவிற்கான வேளாண் சந்தை விலை நிபுணர்.\n{state}, இந்தியாவில் {crop} பயிரின் தற்போதைய மொத்த சந்தை விலைகளை தமிழில் கொடுக்கவும்.\n\nஇந்த சரியான வடிவத்தில் பதில் கொடுக்கவும் (வேறு எந்த உரையும் வேண்டாம்):\nபயிர்: {crop}\nமாநிலம்: {state}\nகிலோ விலை: ரூ [X]/கிலோ\nகுவிண்டால் விலை: ரூ [X]/குவிண்டால்\nகுறைந்தபட்ச விலை: ரூ [X]/கிலோ\nஅதிகபட்ச விலை: ரூ [X]/கிலோ\nசிறந்த சந்தைகள்: [{state}வில் 2-3 சந்தை பெயர்கள்]\nவிலை போக்கு: [அதிகரிக்கிறது/குறக்கிறது/நிலையானது]\nவிவசாயி குறிப்பு: [இந்த பயிரை விற்பது பற்றிய ஒரு நடைமுறை குறிப்பு]\n\nயதார்த்தமான தற்போதைய இந்திய சந்தை விலைகளை பயன்படுத்தவும்."""
-        system_msg = "நீங்கள் ஒரு இந்திய வேளாண் சந்தை விலை நிபுணர். எப்போதும் கோரிய சரியான வடிவத்தில் தமிழில் பதில் கொடுக்கவும்."
-    else:
-        prompt = f"""You are an agricultural market price expert for India.\nProvide current approximate wholesale market prices for {crop} in {state}, India.\n\nGive the response in this exact format (no extra text):\nCrop: {crop}\nState: {state}\nPrice per Kg: Rs [X]/kg\nPrice per Quintal: Rs [X]/quintal\nMin Price: Rs [X]/kg\nMax Price: Rs [X]/kg\nBest Markets: [2-3 market names in {state}]\nPrice Trend: [Rising/Falling/Stable]\nFarmer Tip: [one practical tip about selling this crop]\n\nUse realistic current Indian market prices. Keep it brief and practical."""
-        system_msg = "You are an Indian agricultural market price expert. Always respond in the exact format requested. No extra explanation."
+# --- MARKET ---
 
+@app.get("/market")
+def get_market_prices(crop: str, state: str = "Tamil Nadu", lang: str = "en", username: str = "Anonymous"):
+    if lang == "ta":
+        prompt = f"""நீங்கள் இந்தியாவிற்கான வேளாண் சந்தை விலை நிபுணர்.
+{state}, இந்தியாவில் {crop} பயிரின் தற்போதைய மொத்த சந்தை விலைகளை தமிழில் கொடுக்கவும்.
+
+இந்த சரியான வடிவத்தில் பதில் கொடுக்கவும்:
+பயிர்: {crop}
+மாநிலம்: {state}
+கிலோ விலை: ரூ [X]/கிலோ
+குவிண்டால் விலை: ரூ [X]/குவிண்டால்
+குறைந்தபட்ச விலை: ரூ [X]/கிலோ
+அதிகபட்ச விலை: ரூ [X]/கிலோ
+சிறந்த சந்தைகள்: [2-3 சந்தை பெயர்கள்]
+விலை போக்கு: [அதிகரிக்கிறது/குறைகிறது/நிலையானது]
+விவசாயி குறிப்பு: [ஒரு நடைமுறை குறிப்பு]"""
+        system_msg = "நீங்கள் ஒரு இந்திய வேளாண் சந்தை விலை நிபுணர். தமிழில் மட்டும் பதில் கொடுக்கவும்."
+    else:
+        prompt = f"""You are an agricultural market price expert for India.
+Provide current approximate wholesale market prices for {crop} in {state}, India.
+
+Give the response in this exact format:
+Crop: {crop}
+State: {state}
+Price per Kg: Rs [X]/kg
+Price per Quintal: Rs [X]/quintal
+Min Price: Rs [X]/kg
+Max Price: Rs [X]/kg
+Best Markets: [2-3 market names in {state}]
+Price Trend: [Rising/Falling/Stable]
+Farmer Tip: [one practical tip about selling this crop]"""
+        system_msg = "You are an Indian agricultural market price expert. Always respond in the exact format requested."
     response = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
@@ -469,21 +442,28 @@ def get_market_prices(crop: str, state: str = "Tamil Nadu", lang: str = "en", us
         ],
         max_tokens=512
     )
-    
     prices = strip_think_tags(response.choices[0].message.content)
-    save_verified_log(username, "Market Prices", f"Checked marketplace value for {crop} ({state})")
+    save_log(username, "Market Prices", f"Checked price for {crop} in {state}")
     return {"prices": prices}
 
 
-@app.get("/soil")
-def get_soil_tips(crop: str, season: str, soil_type: str, lang: str = "en", username: str = "Nithish"):
-    if lang == "ta":
-        prompt = f"""நீங்கள் இந்திய விவசாயிகளுக்கான நிபுணர் வேளாண் ஆலோசகர்.\nஇதற்கான நடைமுறை மண் தயாரிப்பு மற்றும் பயிர் வளர்ப்பு குறிப்புகளை தமிழில் கொடுக்கவும்:\nபயிர்: {crop}\nபருவம்: {season}\nமண் வகை: {soil_type}\n\nஇந்த வடிவத்தில் பதில் கொடுக்கவும்:\nபயிர்: {crop}\nபருவம்: {season}\nமண் வகை: {soil_type}\n\nமண் தயாரிப்பு:\n[மண்ணை தயாரிக்க 3-4 எளிய படிகள்]\n\nஉர குறிப்புகள்:\n[என்ன உரங்கள் பயன்படுத்த வேண்டும், ஒரு ஏக்கருக்கு எவ்வளவு, எளிய வார்த்தைகளில்]\n\nநீர்பாசன வழிகாட்டி:\n[எவ்வளவு அடிக்கடி தண்ணீர் கொடுக்க வேண்டும், எவ்வளவு]\n\nசிறந்த நடவு நேரம்:\n[இந்த பருவத்தில் நடவு செய்ய சரியான மாதங்கள்]\n\nஎதிர்பார்க்கப்படும் அறுவடை:\n[அறுவடைக்கு எத்தனை நாட்கள்/மாதங்கள்]\n\nவிவசாயி குறிப்பு:\n[இந்த பயிர் மற்றும் மண் சேர்க்கைக்கான ஒரு முக்கியமான குறிப்பு]"""
-        system_msg = "நீங்கள் ஒரு நிபுணர் இந்திய வேளாண் ஆலோசகர். நடைமுறை, எளிய ஆலோசனை கொடுக்கவும். எப்போதும் கோரிய சரியான வடிவத்தில் தமிழில் பதில் கொடுக்கவும்."
-    else:
-        prompt = f"""You are an expert agricultural advisor for Indian farmers.\nGive practical soil preparation and crop growing tips for:\nCrop: {crop}\nSeason: {season}\nSoil Type: {soil_type}\n\nGive the response in this format:\nCrop: {crop}\nSeason: {season}\nSoil Type: {soil_type}\n\nSoil Preparation:\n[3-4 simple steps to prepare the soil]\n\nFertilizer Tips:\n[what fertilizers to use, how much per acre, in simple terms]\n\nWatering Guide:\n[how often to water, how much]\n\nBest Planting Time:\n[exact months to plant in this season]\n\nExpected Harvest:\n[how many days/months to harvest]\n\nFarmer Tip:\n[one important tip specific to this crop and soil combination]\n\nKeep everything simple and practical for a farmer with no technical background."""
-        system_msg = "You are an expert Indian agricultural advisor. Give practical, simple advice. Always follow the exact format requested."
+# --- SOIL ---
 
+@app.get("/soil")
+def get_soil_tips(crop: str, season: str, soil_type: str, lang: str = "en", username: str = "Anonymous"):
+    if lang == "ta":
+        prompt = f"""நீங்கள் இந்திய விவசாயிகளுக்கான நிபுணர் வேளாண் ஆலோசகர்.
+பயிர்: {crop}, பருவம்: {season}, மண் வகை: {soil_type} இதற்கான குறிப்புகளை தமிழில் கொடுக்கவும்.
+
+மண் தயாரிப்பு, உர குறிப்புகள், நீர்பாசன வழிகாட்டி, சிறந்த நடவு நேரம், எதிர்பார்க்கப்படும் அறுவடை, விவசாயி குறிப்பு என்று பதிலளிக்கவும்."""
+        system_msg = "நீங்கள் ஒரு நிபுணர் இந்திய வேளாண் ஆலோசகர். தமிழில் மட்டும் பதில் கொடுக்கவும்."
+    else:
+        prompt = f"""You are an expert agricultural advisor for Indian farmers.
+Give practical soil and crop tips for:
+Crop: {crop}, Season: {season}, Soil Type: {soil_type}
+
+Cover: Soil Preparation, Fertilizer Tips, Watering Guide, Best Planting Time, Expected Harvest, Farmer Tip."""
+        system_msg = "You are an expert Indian agricultural advisor. Give practical simple advice."
     response = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
@@ -492,21 +472,27 @@ def get_soil_tips(crop: str, season: str, soil_type: str, lang: str = "en", user
         ],
         max_tokens=1024
     )
-    
     tips = strip_think_tags(response.choices[0].message.content)
-    save_verified_log(username, "Soil Advisory", f"Requested optimization guidelines for {crop} in {soil_type}")
+    save_log(username, "Soil Advisory", f"Tips for {crop} in {soil_type}")
     return {"tips": tips}
 
 
-@app.get("/pest")
-def get_pest_alerts(crop: str, state: str, season: str, lang: str = "en", username: str = "Nithish"):
-    if lang == "ta":
-        prompt = f"""நீங்கள் இந்திய விவசாயிகளுக்கான நிபுணர் பூச்சி மேலாண்மை ஆலோசகர்.\nஇதற்கான பூச்சி மற்றும் நோய் எச்சரிக்கைகளை தமிழில் கொடுக்கவும்:\nபயிர்: {crop}\nமாநிலம்/பகுதி: {state}\nபருவம்: {season}\n\nஇந்த வடிவத்தில் பதில் கொடுக்கவும்:\n\nபயிர்: {crop}\nபகுதி: {state}\nபருவம்: {season}\n\nஇந்த பருவத்தில் பொதுவான பூச்சிகள்:\n1. [பூச்சி பெயர்] — [எப்படி தெரியும், என்ன சேதம் செய்யும்]\n2. [பூச்சி பெயர்] — [எப்படி தெரியும், என்ன சேதம் செய்யும்]\n3. [பூச்சி பெயர்] — [எப்படி தெரியும், என்ன சேதம் செய்யும்]\n\nகவனிக்க வேண்டிய எச்சரிக்கை அறிகுறிகள்:\n[விவசாயி வயலில் கவனிக்க வேண்டிய 3 முன்கூட்டிய அறிகுறிகள்]\n\nஇயற்கை சிகிச்சை (மலிவான, உள்ளூர் முறைகள்):\n[உள்ளூரில் கிடைக்கும் பொருட்களை பயன்படுத்தி 2-3 மலிவான இயற்கை தீர்வுகள்]\n\nஇரசாயன சிகிச்சை (தீவிமாக இருந்தால்):\n[உள்ளூர் வேளாண் கடைகளில் கிடைக்கும் 1-2 பொதுவான பூச்சிக்கொல்லிகள், அளவுடன்]\n\nதடுப்பு குறிப்புகள்:\n[2-3 எளிய தடுப்பு நடவடிக்கைகள்]"""
-        system_msg = "நீங்கள் ஒரு நிபுணர் இந்திய வேளாண் பூச்சி மேலாண்மை ஆலோசகர். நடைமுறை, பிராந்திய குறிப்பிட்ட ஆலோசனை கொடுக்கவும். எப்போதும் கோரிய சரியான வடிவத்தில் தமிழில் பதில் கொடுக்கவும்."
-    else:
-        prompt = f"""You are an expert pest management advisor for Indian farmers.\nGive pest and disease alerts for:\nCrop: {crop}\nState/Region: {state}\nSeason: {season}\n\nGive the response in this format:\n\nCrop: {crop}\nRegion: {state}\nSeason: {season}\n\nCommon Pests This Season:\n1. [Pest name] — [what it looks like, what damage it causes]\n2. [Pest name] — [what it looks like, what damage it causes]\n3. [Pest name] — [what it looks like, what damage it causes]\n\nWarning Signs to Watch:\n[3 early warning signs a farmer should look for in the field]\n\nOrganic Treatment (cheap, local methods):\n[2-3 affordable organic solutions using locally available materials]\n\nChemical Treatment (if severe):\n[1-2 common pesticides available at local agri shops, with dosage]\n\nPrevention Tips:\n[2-3 simple prevention steps]\n\nKeep everything simple, practical, and specific to {state} farmers."""
-        system_msg = "You are an expert Indian agricultural pest management advisor. Give practical, region-specific advice. Follow the exact format requested."
+# --- PEST ---
 
+@app.get("/pest")
+def get_pest_alerts(crop: str, state: str, season: str, lang: str = "en", username: str = "Anonymous"):
+    if lang == "ta":
+        prompt = f"""நீங்கள் இந்திய விவசாயிகளுக்கான நிபுணர் பூச்சி மேலாண்மை ஆலோசகர்.
+பயிர்: {crop}, மாநிலம்: {state}, பருவம்: {season} இதற்கான பூச்சி எச்சரிக்கைகளை தமிழில் கொடுக்கவும்.
+
+பொதுவான பூச்சிகள், எச்சரிக்கை அறிகுறிகள், இயற்கை சிகிச்சை, இரசாயன சிகிச்சை, தடுப்பு குறிப்புகள் என்று பதிலளிக்கவும்."""
+        system_msg = "நீங்கள் ஒரு நிபுணர் இந்திய பூச்சி மேலாண்மை ஆலோசகர். தமிழில் மட்டும் பதில் கொடுக்கவும்."
+    else:
+        prompt = f"""You are an expert pest management advisor for Indian farmers.
+Give pest alerts for Crop: {crop}, State: {state}, Season: {season}.
+
+Cover: Common Pests, Warning Signs, Organic Treatment, Chemical Treatment, Prevention Tips."""
+        system_msg = "You are an expert Indian pest management advisor. Give practical region-specific advice."
     response = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
@@ -515,21 +501,23 @@ def get_pest_alerts(crop: str, state: str, season: str, lang: str = "en", userna
         ],
         max_tokens=1024
     )
-    
     alerts = strip_think_tags(response.choices[0].message.content)
-    save_verified_log(username, "Pest Advisory", f"Checked warnings for {crop} during {season}")
+    save_log(username, "Pest Advisory", f"Pest alert for {crop} in {state}")
     return {"alerts": alerts}
 
 
-@app.get("/schemes")
-def get_schemes(state: str, category: str = "All", lang: str = "en", username: str = "Nithish"):
-    if lang == "ta":
-        prompt = f"""நீங்கள் இந்திய விவசாயிகளுக்கான ஒரு அரசு திட்ட நிபுணர்.\n{state} மாநிலத்தில் உள்ள விவசாயிகளுக்குக் கிடைக்கும் முக்கிய தற்போதைய அரசு திட்டங்கள் மற்றும் மானியங்களை தமிழில் பட்டியலிடவும்.\nவகைப்பாடு முன்னுரிமை: {category}\n\nஇந்த தெளிவான வடிவத்தில் பதில் கொடுக்கவும்:\nமாநிலம்: {state}\n\n1. [திட்டத்தின் பெயர்]\n- தகுதி: [யாரெல்லாம் விண்ணப்பிக்கலாம்]\n- நன்மைகள்: [எவ்வளவு உதவி அல்லது மானியம் கிடைக்கும்]\n- விண்ணப்பிக்கும் முறை: [எங்கு அல்லது எப்படி விண்ணப்பிக்க வேண்டும்]\n\n2. [திட்டத்தின் பெயர்]\n- தகுதி: [விவரங்கள்]\n- நன்மைகள்: [விவரங்கள்]\n- விண்ணப்பிக்கும் முறை: [விவரங்கள்]\n\nநடைமுறை, தற்போதைய உண்மையான அரசு திட்டங்களை (எ.கா. PM-KISAN, பயிர் காப்பீடு, சொட்டு நீர் பாசன மானியம்) பயன்படுத்தவும்."""
-        system_msg = "நீங்கள் ஒரு அரசு திட்ட ஆலோசகர். எப்போதும் எளிய தமிழில், துүзியமான வடிவத்தில் மட்டும் பதிலளிக்கவும்."
-    else:
-        prompt = f"""You are an expert government schemes advisor for Indian farmers.\nList important current central and state government agricultural schemes or subsidies available in the state of {state}.\nCategory preference: {category}\n\nProvide the response in this structured format:\nState: {state}\n\n1. [Scheme Name]\n- Eligibility: [Who can apply]\n- Benefits: [Financial aid, loan or subsidy amounts]\n- How to Apply: [Where to apply or official procedure]\n\n2. [Scheme Name]\n- Eligibility: [Details]\n- Benefits: [Details]\n- How to Apply: [Details]\n\nUse authentic, existing Indian welfare initiatives (e.g., PM-KISAN, Fasal Bima Yojana, micro-irrigation subsidies). Keep it simple and clear."""
-        system_msg = "You are an Indian government scheme advisor. Always respond in the exact format requested with no extra chat."
+# --- SCHEMES ---
 
+@app.get("/schemes")
+def get_schemes(state: str, category: str = "All", lang: str = "en", username: str = "Anonymous"):
+    if lang == "ta":
+        prompt = f"""{state} மாநிலத்தில் விவசாயிகளுக்கு கிடைக்கும் முக்கிய அரசு திட்டங்களை தமிழில் பட்டியலிடவும்.
+வகை: {category}. தகுதி, நன்மைகள், விண்ணப்பிக்கும் முறை என்று விளக்கவும்."""
+        system_msg = "நீங்கள் ஒரு அரசு திட்ட ஆலோசகர். தமிழில் மட்டும் பதில் கொடுக்கவும்."
+    else:
+        prompt = f"""List important government agricultural schemes available in {state}, India.
+Category: {category}. For each scheme include: Eligibility, Benefits, How to Apply."""
+        system_msg = "You are an Indian government scheme advisor. Give accurate practical information."
     response = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
@@ -538,10 +526,9 @@ def get_schemes(state: str, category: str = "All", lang: str = "en", username: s
         ],
         max_tokens=1024
     )
-    
     schemes = strip_think_tags(response.choices[0].message.content)
-    save_verified_log(username, "Govt Schemes", f"Searched programs inside {state} matching {category}")
+    save_log(username, "Govt Schemes", f"Schemes in {state} - {category}")
     return {"schemes": schemes}
 
-# Explicit mount initialization rule ordering matches production specifications
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
