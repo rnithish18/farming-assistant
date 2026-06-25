@@ -7,9 +7,11 @@ from groq import Groq
 import base64
 import os
 import re
-import resend
+import smtplib
 import random
 import time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 import requests
 import sqlite3
@@ -17,7 +19,8 @@ import sqlite3
 load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-resend.api_key = os.getenv("RESEND_API_KEY")
+GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 otp_store = {}
 
 app = FastAPI(title="Farming AI Assistant")
@@ -104,23 +107,29 @@ def send_otp(data: dict):
     otp = str(random.randint(100000, 999999))
     otp_store[email] = {"otp": otp, "time": time.time(), "name": name}
     try:
-        resend.Emails.send({
-            "from": "Farming Assistant <onboarding@resend.dev>",
-            "to": email,
-            "subject": f"{otp} is your Farming Assistant OTP",
-            "html": f"""
-            <div style="font-family:Arial,sans-serif;max-width:400px;margin:auto;
-                        background:#f0f7f0;border-radius:12px;padding:30px;text-align:center">
-                <h2 style="color:#2d5e2d">🌾 Farming Assistant</h2>
-                <p style="color:#333">Hello <b>{name}</b>! Your verification code is:</p>
-                <div style="font-size:2.5rem;font-weight:bold;color:#2d5e2d;
-                            background:white;border-radius:8px;padding:20px;margin:20px 0;
-                            letter-spacing:8px">{otp}</div>
-                <p style="color:#666;font-size:0.9rem">This code expires in 10 minutes.</p>
-                <p style="color:#999;font-size:0.8rem">Do not share this code with anyone.</p>
-            </div>
-            """
-        })
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"{otp} is your Farming Assistant OTP"
+        msg["From"] = GMAIL_ADDRESS
+        msg["To"] = email
+        html = f"""
+        <div style="font-family:Arial,sans-serif;max-width:400px;margin:auto;
+                    background:#f0f7f0;border-radius:12px;padding:30px;text-align:center">
+            <h2 style="color:#2d5e2d">🌾 Farming Assistant</h2>
+            <p style="color:#333">Hello <b>{name}</b>! Your verification code is:</p>
+            <div style="font-size:2.5rem;font-weight:bold;color:#2d5e2d;
+                        background:white;border-radius:8px;padding:20px;margin:20px 0;
+                        letter-spacing:8px">{otp}</div>
+            <p style="color:#666;font-size:0.9rem">This code expires in 10 minutes.</p>
+            <p style="color:#999;font-size:0.8rem">Do not share this code with anyone.</p>
+        </div>
+        """
+        msg.attach(MIMEText(html, "html"))
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+            server.sendmail(GMAIL_ADDRESS, email, msg.as_string())
         return {"success": True, "message": "OTP sent successfully"}
     except Exception as e:
         return {"success": False, "message": str(e)}
