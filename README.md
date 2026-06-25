@@ -1,170 +1,130 @@
-\# 🌾 AI-Powered Personal Farming Assistant
+# 🌾 Farming AI Assistant
 
+An AI-powered farming assistant built for Indian farmers to get instant help with crops, weather, market prices, and more — in English and Tamil.
 
+🔗 **Live Demo:** https://farming-assistant-fxvg.onrender.com
 
-A mobile-friendly web app built for Indian farmers to get AI-powered farming help in English and Tamil.
+---
 
-
-
-\## 🔗 Live Demo
-
-👉 \*\*https://farming-assistant-fxvg.onrender.com\*\*
-
-
-
-> Hosted on Render — free tier, may take 30–60 seconds to wake up on first visit.
-
-
-
-\## ✨ Features
-
-
+## 📱 Features
 
 | Feature | Description |
+|--------|-------------|
+| 💬 AI Chat | Ask farming questions in English or Tamil with voice input |
+| 📸 Crop Diagnosis | Upload a plant photo to detect diseases instantly |
+| ☀️ Live Weather | Real-time weather with farming tips for your city |
+| 🌧️ Rain Forecast | 7-day rain prediction with irrigation advice |
+| 📊 Market Prices | Wholesale crop prices in Rs/kg and Rs/quintal |
+| 🌱 Soil Advisory | Soil prep and fertilizer tips by crop and season |
+| 🐛 Pest Alerts | Region-specific pest warnings with organic and chemical fixes |
+| 📋 Govt Schemes | Central and state farming subsidies and loan schemes |
+| 🔐 Registration | Secure farmer login with real Email OTP verification |
 
-|---|---|
+---
 
-| 💬 Ask a Question | AI farming Q\&A in English \& Tamil with voice input |
+## 🛠️ Tech Stack
 
-| 📷 Plant Disease Diagnosis | Upload crop photo for instant disease detection |
+**Backend**
+- Python + FastAPI
+- Groq API (LLaMA 3.3 70B for chat, LLaMA 4 Scout for image diagnosis)
+- OpenWeatherMap API (weather + forecast)
+- Gmail SMTP (Email OTP)
+- SQLite (activity logs + farmer profiles)
 
-| ☀️ Weather | Live weather data with farming tips |
+**Frontend**
+- HTML, CSS, JavaScript (no framework)
+- Web Speech API (voice input)
+- Mobile-friendly responsive design
 
-| 🌧️ Rain Forecast | 7-day rain prediction with daily farming advice |
+**Deployment**
+- Render (live hosting)
+- GitHub (version control)
 
-| 📊 Market Prices | Crop wholesale prices by state (Rs/kg \& Rs/quintal) |
+---
 
-| 🌱 Soil Tips | Soil prep \& fertilizer guide by crop, season, soil type |
+## 🚀 Getting Started Locally
 
-| 🐛 Pest Alert | Region-specific pest warnings with organic \& chemical treatment |
-
-
-
-\## 🛠️ Tech Stack
-
-
-
-\- \*\*Backend:\*\* FastAPI (Python)
-
-\- \*\*AI Models:\*\* Groq API (LLaMA 3.3 70B, Qwen Vision)
-
-\- \*\*Weather:\*\* OpenWeatherMap API
-
-\- \*\*Frontend:\*\* HTML, CSS, JavaScript (mobile-first)
-
-\- \*\*Deployment:\*\* Render
-
-
-
-\## 🚀 Run Locally
-
-
-
+### 1. Clone the repository
 ```bash
-
-git clone https://github.com/rnithish18/farming-assistant
-
+git clone https://github.com/rnithish18/farming-assistant.git
 cd farming-assistant
-
-python -m venv venv
-
-venv\\Scripts\\activate
-
-pip install -r requirements.txt
-
 ```
 
-
-
-Create a `.env` file:
-
-```
-
-GROQ\_API\_KEY=your\_key\_here
-
-OPENWEATHER\_API\_KEY=your\_key\_here
-
-```
-
-
-
+### 2. Create virtual environment
 ```bash
-
-uvicorn main:app --reload
-
+python -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Mac/Linux
 ```
 
+### 3. Install dependencies
+```bash
+pip install -r requirements.txt
+```
 
+### 4. Create .env file
 
-Open http://127.0.0.1:8000
+GROQ_API_KEY=your_groq_api_key
+OPENWEATHER_API_KEY=your_openweather_api_key
+GMAIL_ADDRESS=your_gmail@gmail.com
+GMAIL_APP_PASSWORD=your_gmail_app_password
 
+### 5. Run the server
+```bash
+uvicorn main:app --reload
+```
 
+### 6. Open in browser
 
-\## ☁️ Deploy on Render
+http://127.0.0.1:8000
 
+---
 
+## 🔑 API Keys Required
 
-🌐 \*\*Live App:\*\* https://farming-assistant-fxvg.onrender.com
+| Service | Purpose | Free? |
+|---------|---------|-------|
+| [Groq](https://console.groq.com) | AI chat and image diagnosis | ✅ Free |
+| [OpenWeatherMap](https://openweathermap.org/api) | Weather and forecast | ✅ Free |
+| [Gmail](https://myaccount.google.com/apppasswords) | Email OTP sending | ✅ Free |
 
+---
 
-
-1\. Push your code to GitHub
-
-2\. Go to https://render.com and click \*\*New → Web Service\*\*
-
-3\. Connect your GitHub repo
-
-4\. Set these settings:
-
-&#x20;  - \*\*Build Command:\*\* `pip install -r requirements.txt`
-
-&#x20;  - \*\*Start Command:\*\* `uvicorn main:app --host 0.0.0.0 --port $PORT`
-
-&#x20;  - \*\*Environment:\*\* Python 3
-
-5\. Add environment variables in Render dashboard:
-
-&#x20;  - `GROQ\_API\_KEY` → your Groq API key
-
-&#x20;  - `OPENWEATHER\_API\_KEY` → your OpenWeatherMap API key
-
-6\. Click \*\*Deploy\*\* — your app will be live in 2-3 minutes
-
-
-
-\## 📁 Project Structure
+## 📂 Project Structure
 
 farming-assistant/
 
-├── main.py              # FastAPI backend (all endpoints)
-
+├── main.py              # FastAPI backend with all endpoints
 ├── requirements.txt     # Python dependencies
-
-├── .env                 # API keys (not uploaded to GitHub)
-
+├── .env                 # API keys (not committed)
+├── farming_assistant.db # SQLite database (auto-created)
 └── static/
-
-├── index.html       # Home page (7 feature cards)
-
-├── chat.html        # Ask a Question + Tamil + Voice
-
-├── diagnose.html    # Plant disease diagnosis
-
-├── weather.html     # Current weather
-
+├── index.html       # Home dashboard
+├── register.html    # Farmer registration + OTP
+├── chat.html        # AI chat with Tamil + voice
+├── diagnose.html    # Crop disease diagnosis
+├── weather.html     # Live weather
 ├── forecast.html    # 7-day rain forecast
+├── market.html      # Market prices
+├── soil.html        # Soil advisory
+├── pest.html        # Pest alerts
+└── schemes.html     # Government schemes
+---
 
-├── market.html      # Crop market prices
+## 📸 Screenshots
 
-├── soil.html        # Soil tips by season
+> Home dashboard with all 8 features, farmer registration with Email OTP, AI chat in Tamil, crop disease diagnosis, 7-day rain forecast with farming advice.
 
-└── pest.html        # Pest alerts by region
+---
 
-\## 👨‍💻 Built By
+## 👨‍💻 Developer
 
+**R Nithish**
+- GitHub: [@rnithish18](https://github.com/rnithish18)
+- Project built as a portfolio project for Indian agriculture
 
+---
 
-Nithish R — AI \& Full Stack Developer
+## 📄 License
 
-
-
+MIT License — free to use and modify.
