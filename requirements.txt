@@ -5,3 +5,4 @@ groq
 requests
 python-multipart
 resend
+sendgrid

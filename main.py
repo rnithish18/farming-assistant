@@ -7,11 +7,10 @@ from groq import Groq
 import base64
 import os
 import re
-import smtplib
 import random
 import time
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 from dotenv import load_dotenv
 import requests
 import sqlite3
@@ -19,8 +18,8 @@ import sqlite3
 load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
-GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDER_EMAIL = "farming.assistant.india@gmail.com"
 otp_store = {}
 
 app = FastAPI(title="Farming AI Assistant")
@@ -107,11 +106,7 @@ def send_otp(data: dict):
     otp = str(random.randint(100000, 999999))
     otp_store[email] = {"otp": otp, "time": time.time(), "name": name}
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"{otp} is your Farming Assistant OTP"
-        msg["From"] = GMAIL_ADDRESS
-        msg["To"] = email
-        html = f"""
+        html_content = f"""
         <div style="font-family:Arial,sans-serif;max-width:400px;margin:auto;
                     background:#f0f7f0;border-radius:12px;padding:30px;text-align:center">
             <h2 style="color:#2d5e2d">🌾 Farming Assistant</h2>
@@ -123,13 +118,14 @@ def send_otp(data: dict):
             <p style="color:#999;font-size:0.8rem">Do not share this code with anyone.</p>
         </div>
         """
-        msg.attach(MIMEText(html, "html"))
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-            server.sendmail(GMAIL_ADDRESS, email, msg.as_string())
+        message = Mail(
+            from_email=SENDER_EMAIL,
+            to_emails=email,
+            subject=f"{otp} is your Farming Assistant OTP",
+            html_content=html_content
+        )
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        sg.send(message)
         return {"success": True, "message": "OTP sent successfully"}
     except Exception as e:
         return {"success": False, "message": str(e)}
