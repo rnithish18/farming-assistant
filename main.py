@@ -7,11 +7,9 @@ from groq import Groq
 import base64
 import os
 import re
-import smtplib
+import resend
 import random
 import time
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 import requests
 import sqlite3
@@ -19,8 +17,7 @@ import sqlite3
 load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
-GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+resend.api_key = os.getenv("RESEND_API_KEY")
 otp_store = {}
 
 app = FastAPI(title="Farming AI Assistant")
@@ -96,10 +93,6 @@ def save_log(username: str, feature_type: str, details: str):
     except Exception as e:
         print(f"Logging error: {e}")
 
-@app.get("/favicon.ico", include_in_schema=False)
-def favicon2():
-    return Response(status_code=204)
-
 # --- OTP ENDPOINTS ---
 
 @app.post("/send-otp")
@@ -111,30 +104,26 @@ def send_otp(data: dict):
     otp = str(random.randint(100000, 999999))
     otp_store[email] = {"otp": otp, "time": time.time(), "name": name}
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"{otp} is your Farming Assistant OTP"
-        msg["From"] = GMAIL_ADDRESS
-        msg["To"] = email
-        html = f"""
-        <div style="font-family:Arial,sans-serif;max-width:400px;margin:auto;
-                    background:#f0f7f0;border-radius:12px;padding:30px;text-align:center">
-            <h2 style="color:#2d5e2d">🌾 Farming Assistant</h2>
-            <p style="color:#333">Hello <b>{name}</b>! Your verification code is:</p>
-            <div style="font-size:2.5rem;font-weight:bold;color:#2d5e2d;
-                        background:white;border-radius:8px;padding:20px;margin:20px 0;
-                        letter-spacing:8px">{otp}</div>
-            <p style="color:#666;font-size:0.9rem">This code expires in 10 minutes.</p>
-            <p style="color:#999;font-size:0.8rem">Do not share this code with anyone.</p>
-        </div>
-        """
-        msg.attach(MIMEText(html, "html"))
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-            server.sendmail(GMAIL_ADDRESS, email, msg.as_string())
+        resend.Emails.send({
+            "from": "Farming Assistant <onboarding@resend.dev>",
+            "to": email,
+            "subject": f"{otp} is your Farming Assistant OTP",
+            "html": f"""
+            <div style="font-family:Arial,sans-serif;max-width:400px;margin:auto;
+                        background:#f0f7f0;border-radius:12px;padding:30px;text-align:center">
+                <h2 style="color:#2d5e2d">🌾 Farming Assistant</h2>
+                <p style="color:#333">Hello <b>{name}</b>! Your verification code is:</p>
+                <div style="font-size:2.5rem;font-weight:bold;color:#2d5e2d;
+                            background:white;border-radius:8px;padding:20px;margin:20px 0;
+                            letter-spacing:8px">{otp}</div>
+                <p style="color:#666;font-size:0.9rem">This code expires in 10 minutes.</p>
+                <p style="color:#999;font-size:0.8rem">Do not share this code with anyone.</p>
+            </div>
+            """
+        })
         return {"success": True, "message": "OTP sent successfully"}
     except Exception as e:
         return {"success": False, "message": str(e)}
-
 
 @app.post("/verify-otp")
 def verify_otp(data: dict):
@@ -152,8 +141,7 @@ def verify_otp(data: dict):
     del otp_store[email]
     return {"success": True, "message": "Verified successfully", "name": name}
 
-
-# --- REGISTER (kept for guest support) ---
+# --- REGISTER ---
 
 @app.post("/register-profile")
 def register_profile(request: ProfileRequest):
@@ -176,7 +164,6 @@ def register_profile(request: ProfileRequest):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-
 # --- LOGS ---
 
 @app.post("/save-log")
@@ -186,7 +173,6 @@ def save_user_log(request: LogRequest):
         return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
-
 
 @app.get("/get-logs")
 def get_user_logs(username: str):
@@ -203,7 +189,6 @@ def get_user_logs(username: str):
         return {"history": history}
     except Exception as e:
         return {"error": str(e)}
-
 
 # --- PAGE ROUTES ---
 
@@ -235,7 +220,6 @@ def serve_pest_page(): return FileResponse("static/pest.html")
 @app.get("/schemes.html", response_class=HTMLResponse)
 def serve_schemes_page(): return FileResponse("static/schemes.html")
 
-
 # --- CHAT ---
 
 @app.post("/chat")
@@ -262,7 +246,6 @@ def chat(request: ChatRequest):
     reply = strip_think_tags(response.choices[0].message.content)
     save_log(request.username, "AI Chatbot", f"Asked: {request.message[:40]}...")
     return {"reply": reply}
-
 
 # --- DIAGNOSE ---
 
@@ -301,7 +284,6 @@ async def diagnose(file: UploadFile = File(...), lang: str = "en", username: str
     save_log(username, "Crop Diagnosis", f"Uploaded image: {file.filename}")
     return {"diagnosis": diagnosis}
 
-
 # --- WEATHER ---
 
 @app.get("/weather")
@@ -338,7 +320,6 @@ def get_weather(city: str, lang: str = "en", username: str = "Anonymous"):
         "wind_speed": data["wind"]["speed"],
         "farming_tip": tip
     }
-
 
 # --- FORECAST ---
 
@@ -399,7 +380,6 @@ def get_forecast(city: str, lang: str = "en", username: str = "Anonymous"):
     save_log(username, "Weather Forecast", f"7-day forecast for {data['city']['name']}")
     return {"city": data["city"]["name"], "forecast": forecast}
 
-
 # --- MARKET ---
 
 @app.get("/market")
@@ -446,7 +426,6 @@ Farmer Tip: [one practical tip about selling this crop]"""
     save_log(username, "Market Prices", f"Checked price for {crop} in {state}")
     return {"prices": prices}
 
-
 # --- SOIL ---
 
 @app.get("/soil")
@@ -476,7 +455,6 @@ Cover: Soil Preparation, Fertilizer Tips, Watering Guide, Best Planting Time, Ex
     save_log(username, "Soil Advisory", f"Tips for {crop} in {soil_type}")
     return {"tips": tips}
 
-
 # --- PEST ---
 
 @app.get("/pest")
@@ -505,7 +483,6 @@ Cover: Common Pests, Warning Signs, Organic Treatment, Chemical Treatment, Preve
     save_log(username, "Pest Advisory", f"Pest alert for {crop} in {state}")
     return {"alerts": alerts}
 
-
 # --- SCHEMES ---
 
 @app.get("/schemes")
@@ -529,6 +506,5 @@ Category: {category}. For each scheme include: Eligibility, Benefits, How to App
     schemes = strip_think_tags(response.choices[0].message.content)
     save_log(username, "Govt Schemes", f"Schemes in {state} - {category}")
     return {"schemes": schemes}
-
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
