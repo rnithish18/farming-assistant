@@ -40,7 +40,12 @@
             background: #fff8e1; padding: 15px; border-radius: 8px;
             border-left: 4px solid #f59e0b; margin-top: 10px; display: none;
         }
-        .otp-box p { color: #92400e; font-size: 0.9rem; margin-bottom: 12px; }
+        .otp-box p { color: #92400e; font-size: 0.9rem; margin-bottom: 8px; }
+        .spam-note {
+            background: #fff3cd; border-left: 4px solid #ffc107;
+            padding: 10px 12px; border-radius: 0 8px 8px 0;
+            font-size: 0.85rem; color: #856404; margin-bottom: 12px;
+        }
         #status-msg {
             margin-top: 15px; font-weight: bold;
             font-size: 0.9rem; text-align: center; min-height: 20px;
@@ -85,8 +90,12 @@
         </div>
 
         <div class="otp-box" id="otp-step">
-            <p>✅ OTP sent to your email! Check your inbox and enter the 6-digit code below.</p>
-            <label>Enter OTP:</label>
+            <p>✅ OTP sent to your email!</p>
+            <div class="spam-note">
+                📬 Can't find it? Check your <b>Spam</b> or <b>Junk</b> folder.
+                Mark it as "Not Spam" for future emails.
+            </div>
+            <label>Enter 6-digit OTP:</label>
             <input type="text" id="otp-input" placeholder="Enter 6-digit OTP" maxlength="6">
             <button onclick="verifyOTP()" style="background:#f59e0b;">Verify & Enter App</button>
         </div>
@@ -94,8 +103,11 @@
         <p id="status-msg"></p>
     </div>
 
+    <div style="text-align:center;padding:14px 10px;font-size:0.8rem;color:#777;margin-top:10px">
+        Developed by Nithish | Software Engineering Student
+    </div>
+
     <script>
-        // If already logged in, go straight to app
         if (localStorage.getItem('farmer_username')) {
             window.location.replace('/static/index.html');
         }
@@ -140,7 +152,7 @@
                     localStorage.setItem('farmer_gender', gender);
                     localStorage.setItem('farmer_email', email);
                     document.getElementById('otp-step').style.display = 'block';
-                    showMsg('OTP sent! Check your email inbox.', 'green');
+                    showMsg('OTP sent! Check inbox or spam folder.', 'green');
                 } else {
                     showMsg('Error: ' + data.message, 'red');
                 }
@@ -180,9 +192,5 @@
             msg.style.color = color === 'red' ? '#d32f2f' : '#2d5e2d';
         }
     </script>
-
-<div style="text-align:center;padding:14px 10px;font-size:0.8rem;color:#777;background:transparent;margin-top:10px">
-  Developed by Nithish | Software Engineering Student
-</div>
 </body>
 </html>
