@@ -6,3 +6,5 @@ requests
 python-multipart
 resend
 sendgrid
+pymongo[srv]
+bcrypt

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Farming Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif; background-color: #f4f9f4;
+            color: #1a3d1a; display: flex; flex-direction: column;
+            min-height: 100vh; justify-content: center; align-items: center; padding: 20px;
+        }
+        .box {
+            background: white; width: 100%; max-width: 420px;
+            padding: 30px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-top: 5px solid #2d5e2d;
+        }
+        h2 { color: #2d5e2d; margin-bottom: 20px; font-size: 1.3rem; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 0.95rem; }
+        input {
+            width: 100%; padding: 11px; border: 1.5px solid #ccc;
+            border-radius: 8px; font-size: 0.95rem; margin-bottom: 15px; font-family: inherit;
+        }
+        input:focus { border-color: #2d5e2d; outline: none; }
+        button {
+            width: 100%; background: #2d5e2d; color: white;
+            border: none; padding: 13px; font-weight: bold;
+            border-radius: 8px; cursor: pointer; font-size: 1rem; margin-top: 5px;
+        }
+        button:hover { background: #1b5e20; }
+        .link { text-align: center; margin-top: 15px; font-size: 0.9rem; }
+        .link a { color: #2d5e2d; text-decoration: none; font-weight: bold; }
+        #status-msg { margin-top: 15px; font-weight: bold; font-size: 0.9rem; text-align: center; }
+        .forgot-section {
+            background: #fff8e1; padding: 15px; border-radius: 8px;
+            border-left: 4px solid #f59e0b; margin-top: 15px; display: none;
+        }
+        .forgot-section p { color: #92400e; font-size: 0.85rem; margin-bottom: 10px; }
+        .spam-note {
+            background: #fff3cd; border-left: 3px solid #ffc107;
+            padding: 8px 10px; border-radius: 0 6px 6px 0;
+            font-size: 0.8rem; color: #856404; margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>🌾 Login</h2>
+
+        <div id="login-section">
+            <label>Username:</label>
+            <input type="text" id="login-username" placeholder="Enter your username">
+
+            <label>Password:</label>
+            <input type="password" id="login-password" placeholder="Enter your password">
+
+            <button onclick="doLogin()">Login</button>
+
+            <div class="link" style="margin-top:12px;">
+                <a href="#" onclick="showForgot()">Forgot Password?</a>
+                &nbsp;|&nbsp;
+                <a href="/static/register.html">New user? Register</a>
+            </div>
+        </div>
+
+        <div class="forgot-section" id="forgot-section">
+            <p>Enter your registered email to reset your password.</p>
+
+            <div id="forgot-step1">
+                <label>Email Address:</label>
+                <input type="email" id="forgot-email" placeholder="Enter your email">
+                <button onclick="sendForgotOTP()" style="background:#f59e0b;">Send OTP</button>
+            </div>
+
+            <div id="forgot-step2" style="display:none;">
+                <div class="spam-note">📬 Check your Spam/Junk folder if not in inbox.</div>
+                <label>Enter OTP:</label>
+                <input type="text" id="forgot-otp" placeholder="6-digit OTP" maxlength="6">
+                <label>New Password:</label>
+                <input type="password" id="new-password" placeholder="Min 6 characters">
+                <button onclick="resetPassword()" style="background:#f59e0b;">Reset Password</button>
+            </div>
+
+            <div style="text-align:center;margin-top:10px;">
+                <a href="#" onclick="hideForgot()" style="color:#2d5e2d;font-size:0.85rem;">Back to Login</a>
+            </div>
+        </div>
+
+        <p id="status-msg"></p>
+    </div>
+
+    <div style="text-align:center;padding:14px;font-size:0.8rem;color:#777;margin-top:10px">
+        Developed by Nithish | Software Engineering Student
+    </div>
+
+    <script>
+        if (localStorage.getItem('farmer_username')) {
+            window.location.replace('/static/index.html');
+        }
+
+        async function doLogin() {
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+            if (!username || !password) { showMsg('Please enter username and password.', 'red'); return; }
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('farmer_username', data.username);
+                    showMsg('Welcome back, ' + data.username + '!', 'green');
+                    setTimeout(() => { window.location.href = '/static/index.html'; }, 1000);
+                } else {
+                    showMsg(data.message, 'red');
+                }
+            } catch (e) {
+                showMsg('Error: Could not reach server.', 'red');
+            }
+        }
+
+        function showForgot() {
+            document.getElementById('forgot-section').style.display = 'block';
+            document.getElementById('login-section').style.opacity = '0.4';
+        }
+
+        function hideForgot() {
+            document.getElementById('forgot-section').style.display = 'none';
+            document.getElementById('login-section').style.opacity = '1';
+            showMsg('', 'green');
+        }
+
+        async function sendForgotOTP() {
+            const email = document.getElementById('forgot-email').value.trim();
+            if (!email) { showMsg('Please enter your email.', 'red'); return; }
+            try {
+                const res = await fetch('/forgot-password/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('forgot-step1').style.display = 'none';
+                    document.getElementById('forgot-step2').style.display = 'block';
+                    showMsg('OTP sent! Check inbox or spam folder.', 'green');
+                } else {
+                    showMsg(data.message, 'red');
+                }
+            } catch (e) {
+                showMsg('Error: Could not reach server.', 'red');
+            }
+        }
+
+        async function resetPassword() {
+            const email = document.getElementById('forgot-email').value.trim();
+            const otp = document.getElementById('forgot-otp').value.trim();
+            const new_password = document.getElementById('new-password').value.trim();
+            if (!otp || otp.length !== 6) { showMsg('Please enter 6-digit OTP.', 'red'); return; }
+            if (!new_password || new_password.length < 6) { showMsg('Password must be at least 6 characters.', 'red'); return; }
+            try {
+                const res = await fetch('/forgot-password/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, otp, new_password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showMsg('Password reset! Please login.', 'green');
+                    setTimeout(() => { hideForgot(); }, 2000);
+                } else {
+                    showMsg(data.message, 'red');
+                }
+            } catch (e) {
+                showMsg('Error: Could not reach server.', 'red');
+            }
+        }
+
+        function showMsg(text, color) {
+            const msg = document.getElementById('status-msg');
+            msg.textContent = text;
+            msg.style.color = color === 'red' ? '#d32f2f' : '#2d5e2d';
+        }
+    </script>
+</body>
+</html>
