@@ -133,18 +133,14 @@ def register(request: RegisterRequest):
     if len(password) < 6:
         return {"success": False, "message": "Password must be at least 6 characters."}
 
-    # Check if username already exists
     if users_col.find_one({"username": username}):
         return {"success": False, "message": "Username already taken. Please choose another."}
 
-    # Check if email already exists
     if users_col.find_one({"email": email}):
         return {"success": False, "message": "Email already registered. Please login."}
 
-    # Hash password
     hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
 
-    # Save to MongoDB
     users_col.insert_one({
         "username": username,
         "email": email,
@@ -220,6 +216,81 @@ def reset_password(request: ResetPasswordRequest):
     return {"success": True, "message": "Password reset successfully! Please login."}
 
 
+# --- PROFILE PHOTO ---
+
+@app.post("/upload-photo")
+def upload_photo(data: dict):
+    username = data.get("username", "").strip()
+    photo = data.get("photo", "")
+    if not username or not photo:
+        return {"success": False, "message": "Missing data"}
+    if len(photo) > 1400000:
+        return {"success": False, "message": "Image too large"}
+    users_col.update_one({"username": username}, {"$set": {"photo": photo}})
+    return {"success": True, "message": "Photo updated"}
+
+
+@app.get("/get-photo")
+def get_photo(username: str):
+    user = users_col.find_one({"username": username})
+    if user and user.get("photo"):
+        return {"success": True, "photo": user["photo"]}
+    return {"success": False, "photo": None}
+
+
+# --- PROFILE ---
+
+@app.get("/profile")
+def get_profile(username: str):
+    user = users_col.find_one({"username": username})
+    if not user:
+        return {"success": False, "message": "User not found"}
+
+    total = db["activity_logs"].count_documents({"username": username})
+
+    pipeline = [
+        {"$match": {"username": username}},
+        {"$group": {"_id": "$feature_type", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 1}
+    ]
+    result = list(db["activity_logs"].aggregate(pipeline))
+    most_used = result[0]["_id"] if result else "None yet"
+
+    created_at = user.get("created_at", time.time())
+    member_since = time.strftime("%d %b %Y", time.localtime(created_at))
+
+    return {
+        "success": True,
+        "email": user["email"],
+        "total_activities": total,
+        "most_used_feature": most_used,
+        "member_since": member_since
+    }
+
+
+@app.post("/change-password")
+def change_password(data: dict):
+    username = data.get("username", "").strip()
+    current_password = data.get("current_password", "").strip()
+    new_password = data.get("new_password", "").strip()
+
+    user = users_col.find_one({"username": username})
+    if not user:
+        return {"success": False, "message": "User not found"}
+
+    if not bcrypt.checkpw(current_password.encode("utf-8"), user["password"]):
+        return {"success": False, "message": "Current password is incorrect"}
+
+    if len(new_password) < 6:
+        return {"success": False, "message": "New password must be at least 6 characters"}
+
+    hashed = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt())
+    users_col.update_one({"username": username}, {"$set": {"password": hashed}})
+
+    return {"success": True, "message": "Password updated successfully"}
+
+
 # --- LOGS ---
 
 @app.post("/save-log")
@@ -283,6 +354,9 @@ def serve_login(): return FileResponse("static/login.html")
 
 @app.get("/register.html", response_class=HTMLResponse)
 def serve_register(): return FileResponse("static/register.html")
+
+@app.get("/profile.html", response_class=HTMLResponse)
+def serve_profile(): return FileResponse("static/profile.html")
 
 
 # --- CHAT ---
