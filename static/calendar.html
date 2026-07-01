@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crop Calendar - Farming Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background-color: #f4f9f4; color: #1a3d1a; }
+        header {
+            background: linear-gradient(135deg, #2d5e2d, #1b441b);
+            color: white; padding: 15px 20px;
+            display: flex; align-items: center; gap: 15px;
+        }
+        header a { color: white; text-decoration: none; font-size: 1.5rem; }
+        header h1 { font-size: 1.3rem; flex: 1; }
+        .lang-toggle {
+            display: flex; background: rgba(255,255,255,0.2);
+            border-radius: 20px; overflow: hidden;
+        }
+        .lang-toggle button {
+            background: none; border: none; color: white;
+            padding: 6px 12px; font-size: 0.85rem; cursor: pointer;
+        }
+        .lang-toggle button.active {
+            background: white; color: #2d5e2d; font-weight: bold;
+        }
+        .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
+        .input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .input-row input {
+            flex: 1; padding: 12px; border: 1.5px solid #ccc;
+            border-radius: 8px; font-size: 0.95rem; font-family: inherit;
+        }
+        .mic-btn {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: #2d5e2d; color: white; border: none;
+            font-size: 1.2rem; cursor: pointer; flex-shrink: 0;
+        }
+        .mic-btn.recording { background: #cc0000; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+        select {
+            width: 100%; padding: 12px; border: 1.5px solid #ccc;
+            border-radius: 8px; font-size: 0.95rem; margin-bottom: 12px;
+            font-family: inherit; background: white;
+        }
+        .btn-row { display: flex; gap: 10px; }
+        button.main-btn {
+            flex: 1; padding: 14px; background-color: #2d5e2d;
+            color: white; border: none; border-radius: 8px;
+            font-size: 1.05rem; cursor: pointer;
+        }
+        button.main-btn:disabled { background-color: #999; }
+        button.speak-btn {
+            width: 48px; height: 48px; background: #1b441b;
+            color: white; border: none; border-radius: 8px;
+            font-size: 1.2rem; cursor: pointer; flex-shrink: 0;
+        }
+        button.speak-btn.speaking { background: #cc0000; }
+        .voice-status { text-align: center; color: #cc0000; font-size: 0.85rem; margin-top: 6px; min-height: 18px; }
+        .loading { text-align: center; margin-top: 20px; color: #555; display: none; }
+        .result-box {
+            background: white; border-radius: 12px; padding: 20px;
+            margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: pre-wrap; line-height: 1.8; display: none; font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/static/index.html">←</a>
+        <h1 id="pageTitle">📅 Crop Calendar</h1>
+        <div class="lang-toggle">
+            <button id="btnEn" class="active" onclick="setLang('en')">EN</button>
+            <button id="btnTa" onclick="setLang('ta')">தமிழ்</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="input-row">
+            <input type="text" id="cropInput" placeholder="Enter crop name e.g. Rice, Cotton">
+            <button class="mic-btn" id="micBtn" onclick="toggleVoice()">🎤</button>
+        </div>
+        <div class="voice-status" id="voiceStatus"></div>
+
+        <select id="stateSelect">
+            <option value="Tamil Nadu">Tamil Nadu</option>
+            <option value="Andhra Pradesh">Andhra Pradesh</option>
+            <option value="Karnataka">Karnataka</option>
+            <option value="Maharashtra">Maharashtra</option>
+            <option value="Punjab">Punjab</option>
+            <option value="Uttar Pradesh">Uttar Pradesh</option>
+            <option value="Rajasthan">Rajasthan</option>
+            <option value="Gujarat">Gujarat</option>
+            <option value="West Bengal">West Bengal</option>
+            <option value="Madhya Pradesh">Madhya Pradesh</option>
+        </select>
+
+        <div class="btn-row">
+            <button class="main-btn" id="searchBtn" onclick="getCalendar()">Get Crop Calendar</button>
+            <button class="speak-btn" id="speakBtn" onclick="toggleSpeak()" title="Read aloud">🔊</button>
+        </div>
+
+        <div class="loading" id="loading">Loading crop calendar...</div>
+        <div class="result-box" id="resultBox"></div>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let recognition = null;
+        let isRecording = false;
+        let synth = window.speechSynthesis;
+        let isSpeaking = false;
+        let lastResult = '';
+
+        const t = {
+            en: {
+                title: '📅 Crop Calendar',
+                placeholder: 'Enter crop name e.g. Rice, Cotton',
+                btn: 'Get Crop Calendar',
+                loading: 'Loading crop calendar...',
+                voiceListening: '🔴 Listening... speak now',
+                voiceDone: '✅ Got it! Click Get Crop Calendar.'
+            },
+            ta: {
+                title: '📅 பயிர் காலண்டர்',
+                placeholder: 'பயிர் பெயரை உள்ளிடவும் எ.கா. நெல், பருத்தி',
+                btn: 'பயிர் காலண்டர் பெறவும்',
+                loading: 'பயிர் காலண்டர் ஏற்றுகிறது...',
+                voiceListening: '🔴 கேட்கிறேன்... இப்போது பேசுங்கள்',
+                voiceDone: '✅ கிடைத்தது! பயிர் காலண்டர் பெறவும் கிளிக் செய்யுங்கள்.'
+            }
+        };
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.getElementById('pageTitle').textContent = t[lang].title;
+            document.getElementById('cropInput').placeholder = t[lang].placeholder;
+            document.getElementById('searchBtn').textContent = t[lang].btn;
+            document.getElementById('loading').textContent = t[lang].loading;
+            document.getElementById('btnEn').classList.toggle('active', lang === 'en');
+            document.getElementById('btnTa').classList.toggle('active', lang === 'ta');
+            localStorage.setItem('app_lang', lang);
+        }
+
+        // Load saved lang
+        const savedLang = localStorage.getItem('app_lang');
+        if (savedLang) setLang(savedLang);
+
+        function toggleVoice() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Voice input not supported. Please use Chrome.');
+                return;
+            }
+            if (isRecording) { recognition.stop(); return; }
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SR();
+            recognition.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            recognition.interimResults = false;
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('micBtn').classList.add('recording');
+                document.getElementById('micBtn').textContent = '⏹';
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceListening;
+            };
+            recognition.onresult = (e) => {
+                document.getElementById('cropInput').value = e.results[0][0].transcript;
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceDone;
+            };
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+            };
+            recognition.onerror = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+                document.getElementById('voiceStatus').textContent = '❌ Could not hear. Try again.';
+            };
+            recognition.start();
+        }
+
+        function toggleSpeak() {
+            if (isSpeaking) {
+                synth.cancel();
+                isSpeaking = false;
+                document.getElementById('speakBtn').classList.remove('speaking');
+                document.getElementById('speakBtn').textContent = '🔊';
+                return;
+            }
+            if (!lastResult) { alert('No result to read. Please get calendar first.'); return; }
+            const utterance = new SpeechSynthesisUtterance(lastResult);
+            utterance.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            utterance.rate = 0.9;
+            utterance.onstart = () => {
+                isSpeaking = true;
+                document.getElementById('speakBtn').classList.add('speaking');
+                document.getElementById('speakBtn').textContent = '⏹';
+            };
+            utterance.onend = () => {
+                isSpeaking = false;
+                document.getElementById('speakBtn').classList.remove('speaking');
+                document.getElementById('speakBtn').textContent = '🔊';
+            };
+            synth.speak(utterance);
+        }
+
+        async function getCalendar() {
+            const crop = document.getElementById('cropInput').value.trim();
+            const state = document.getElementById('stateSelect').value;
+            const btn = document.getElementById('searchBtn');
+            const loading = document.getElementById('loading');
+            const resultBox = document.getElementById('resultBox');
+            const username = localStorage.getItem('farmer_username') || 'Anonymous';
+
+            if (!crop) { alert('Please enter a crop name.'); return; }
+
+            if (isSpeaking) { synth.cancel(); isSpeaking = false; }
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            resultBox.style.display = 'none';
+            document.getElementById('voiceStatus').textContent = '';
+
+            try {
+                const response = await fetch(`/crop-calendar?crop=${encodeURIComponent(crop)}&state=${encodeURIComponent(state)}&lang=${currentLang}&username=${encodeURIComponent(username)}`);
+                const data = await response.json();
+                lastResult = data.calendar;
+                resultBox.textContent = data.calendar;
+                resultBox.style.display = 'block';
+            } catch (e) {
+                resultBox.textContent = 'Error: could not reach the server.';
+                resultBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

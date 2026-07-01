@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Response
+from fastapi import FastAPI, UploadFile, File, Response, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
@@ -358,6 +358,9 @@ def serve_register(): return FileResponse("static/register.html")
 @app.get("/profile.html", response_class=HTMLResponse)
 def serve_profile(): return FileResponse("static/profile.html")
 
+@app.get("/calendar.html", response_class=HTMLResponse)
+def serve_calendar(): return FileResponse("static/calendar.html")
+
 
 # --- CHAT ---
 
@@ -553,6 +556,24 @@ def get_schemes(state: str, category: str = "All", lang: str = "en", username: s
         max_tokens=1024
     )
     return {"schemes": strip_think_tags(response.choices[0].message.content)}
+
+
+# --- CROP CALENDAR ---
+
+@app.get("/crop-calendar")
+def get_crop_calendar(crop: str, state: str = "Tamil Nadu", lang: str = "en", username: str = "Anonymous"):
+    if lang == "ta":
+        prompt = f"{state}வில் {crop} பயிருக்கான மாதவாரியான பயிர் காலண்டரை தமிழில் கொடுக்கவும். நடவு மாதங்கள், வளர்ச்சி நிலைகள், அறுவடை மாதங்கள், ஒவ்வொரு கட்டத்திலும் கவனிக்க வேண்டிய முக்கிய பணிகள் என்று பட்டியலிடவும்."
+        system_msg = "தமிழில் மட்டும் பதில் கொடுக்கவும்."
+    else:
+        prompt = f"Give a month-by-month crop calendar for {crop} in {state}, India. Include: Best Sowing Months, Growth Stages with approximate duration, Harvesting Months, Key Tasks for each stage (land prep, sowing, weeding, fertilizing, harvesting)."
+        system_msg = "You are an expert Indian agricultural crop calendar advisor."
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
+        max_tokens=1024
+    )
+    return {"calendar": strip_think_tags(response.choices[0].message.content)}
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
