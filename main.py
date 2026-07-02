@@ -139,6 +139,32 @@ def verify_otp(data: dict):
     return {"success": True, "message": "Verified successfully", "name": name}
 
 
+# --- GUEST LOGIN ---
+
+@app.post("/guest-login")
+def guest_login(data: dict):
+    username = data.get("username", "").strip()
+    if not username:
+        return {"success": False, "message": "Please enter a name."}
+    if len(username) < 2:
+        return {"success": False, "message": "Name must be at least 2 characters."}
+
+    existing = users_col.find_one({"username": username})
+    if existing and not existing.get("is_guest"):
+        return {"success": False, "message": "That name is taken by a registered account. Please choose another."}
+
+    if not existing:
+        users_col.insert_one({
+            "username": username,
+            "email": None,
+            "password": None,
+            "is_guest": True,
+            "created_at": time.time()
+        })
+
+    return {"success": True, "message": f"Welcome, {username}!", "username": username}
+
+
 @app.post("/register")
 def register(request: RegisterRequest):
     username = request.username.strip()
@@ -162,6 +188,7 @@ def register(request: RegisterRequest):
         "username": username,
         "email": email,
         "password": hashed,
+        "is_guest": False,
         "created_at": time.time()
     })
 
@@ -176,6 +203,9 @@ def login(request: LoginRequest):
     user = users_col.find_one({"username": username})
     if not user:
         return {"success": False, "message": "Username not found. Please register first."}
+
+    if user.get("is_guest"):
+        return {"success": False, "message": "This is a guest account with no password. Use Guest Login instead."}
 
     if not bcrypt.checkpw(password.encode("utf-8"), user["password"]):
         return {"success": False, "message": "Incorrect password. Please try again."}
@@ -279,10 +309,11 @@ def get_profile(username: str):
 
     return {
         "success": True,
-        "email": user["email"],
+        "email": user.get("email") or "Guest account (no email)",
         "total_activities": total,
         "most_used_feature": most_used,
-        "member_since": member_since
+        "member_since": member_since,
+        "is_guest": user.get("is_guest", False)
     }
 
 
@@ -295,6 +326,9 @@ def change_password(data: dict):
     user = users_col.find_one({"username": username})
     if not user:
         return {"success": False, "message": "User not found"}
+
+    if user.get("is_guest"):
+        return {"success": False, "message": "Guest accounts don't have passwords."}
 
     if not bcrypt.checkpw(current_password.encode("utf-8"), user["password"]):
         return {"success": False, "message": "Current password is incorrect"}

@@ -41,6 +41,10 @@
         .stat-label { color: #666; }
         .stat-value { font-weight: bold; color: #2d5e2d; }
         #status-msg { text-align: center; font-weight: bold; font-size: 0.9rem; margin-top: 10px; }
+        .guest-note {
+            background: #fff8e1; padding: 12px; border-radius: 8px;
+            border-left: 4px solid #f59e0b; font-size: 0.85rem; color: #92400e;
+        }
     </style>
 </head>
 <body>
@@ -76,7 +80,7 @@
             </div>
         </div>
 
-        <div class="box">
+        <div class="box" id="password-box">
             <h3>🔒 Change Password</h3>
             <label>Current Password:</label>
             <input type="password" id="current-password" placeholder="Enter current password">
@@ -84,6 +88,10 @@
             <input type="password" id="new-password" placeholder="Min 6 characters">
             <button onclick="changePassword()">Update Password</button>
             <p id="status-msg"></p>
+        </div>
+
+        <div class="box guest-note" id="guest-note" style="display:none;">
+            👀 You're using a guest account. Register with email to unlock password protection and secure login.
         </div>
     </div>
 
@@ -156,6 +164,10 @@
                         <div class="stat-row"><span class="stat-label">Member Since</span><span class="stat-value">${data.member_since}</span></div>
                         <div class="stat-row"><span class="stat-label">Most Used Feature</span><span class="stat-value">${data.most_used_feature}</span></div>
                     `;
+                    if (data.is_guest) {
+                        document.getElementById('password-box').style.display = 'none';
+                        document.getElementById('guest-note').style.display = 'block';
+                    }
                 }
             } catch (e) {
                 document.getElementById('stats-container').innerHTML = '<div class="stat-row">Could not load stats.</div>';

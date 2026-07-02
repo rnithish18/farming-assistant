@@ -30,6 +30,29 @@
             border-radius: 8px; cursor: pointer; font-size: 1rem; margin-top: 5px;
         }
         button:hover { background: #1b5e20; }
+        .btn-guest {
+            background: #f59e0b;
+        }
+        .btn-guest:hover { background: #d97706; }
+        .btn-skip {
+            background: none; color: #2d5e2d; border: 2px solid #2d5e2d;
+        }
+        .btn-skip:hover { background: #f0f7f0; }
+        .divider {
+            text-align: center; color: #999; font-size: 0.85rem;
+            margin: 18px 0; position: relative;
+        }
+        .divider::before, .divider::after {
+            content: ''; position: absolute; top: 50%;
+            width: 40%; height: 1px; background: #ddd;
+        }
+        .divider::before { left: 0; }
+        .divider::after { right: 0; }
+        .guest-box {
+            background: #fff8e1; padding: 15px; border-radius: 8px;
+            border-left: 4px solid #f59e0b; margin-top: 5px;
+        }
+        .guest-box label { color: #92400e; }
         .otp-box {
             background: #fff8e1; padding: 15px; border-radius: 8px;
             border-left: 4px solid #f59e0b; margin-top: 15px; display: none;
@@ -62,11 +85,7 @@
             <label>Confirm Password:</label>
             <input type="password" id="reg-confirm" placeholder="Repeat your password">
 
-            <button onclick="sendOTP()">Continue</button>
-
-            <div class="link">
-                Already have an account? <a href="/static/login.html">Login</a>
-            </div>
+            <button onclick="sendOTP()">Continue with Email OTP</button>
         </div>
 
         <div class="otp-box" id="otp-step">
@@ -75,6 +94,20 @@
             <label>Enter 6-digit OTP:</label>
             <input type="text" id="otp-input" placeholder="Enter OTP" maxlength="6">
             <button onclick="verifyAndRegister()" style="background:#f59e0b;">Verify & Create Account</button>
+        </div>
+
+        <div class="divider">or</div>
+
+        <div class="guest-box">
+            <label>Guest name:</label>
+            <input type="text" id="guest-username" placeholder="Enter any name to continue as guest" style="margin-bottom:10px;">
+            <button class="btn-guest" onclick="guestLogin()">⚡ Continue as Guest</button>
+        </div>
+
+        <button class="btn-skip" onclick="skipLogin()" style="margin-top:10px;">👀 Use Without Account</button>
+
+        <div class="link" style="margin-top:15px;">
+            Already have an account? <a href="/static/login.html">Login</a>
         </div>
 
         <p id="status-msg"></p>
@@ -87,6 +120,35 @@
     <script>
         if (localStorage.getItem('farmer_username')) {
             window.location.replace('/static/index.html');
+        }
+
+        async function guestLogin() {
+            const username = document.getElementById('guest-username').value.trim();
+            if (!username) { showMsg('Please enter a name for guest login.', 'red'); return; }
+            try {
+                const res = await fetch('/guest-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('farmer_username', data.username);
+                    localStorage.setItem('login_type', 'guest');
+                    showMsg('Welcome, ' + data.username + '!', 'green');
+                    setTimeout(() => { window.location.href = '/static/index.html'; }, 800);
+                } else {
+                    showMsg(data.message, 'red');
+                }
+            } catch (e) {
+                showMsg('Error: Could not reach server.', 'red');
+            }
+        }
+
+        function skipLogin() {
+            localStorage.setItem('farmer_username', 'Guest');
+            localStorage.setItem('login_type', 'skip');
+            window.location.href = '/static/index.html';
         }
 
         async function sendOTP() {
@@ -128,7 +190,6 @@
 
             if (!otp || otp.length !== 6) { showMsg('Please enter the 6-digit OTP.', 'red'); return; }
 
-            // First verify OTP
             try {
                 const otpRes = await fetch('/verify-otp', {
                     method: 'POST',
@@ -138,7 +199,6 @@
                 const otpData = await otpRes.json();
                 if (!otpData.success) { showMsg(otpData.message, 'red'); return; }
 
-                // OTP verified — now register
                 const regRes = await fetch('/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -147,6 +207,7 @@
                 const regData = await regRes.json();
                 if (regData.success) {
                     localStorage.setItem('farmer_username', username);
+                    localStorage.setItem('login_type', 'registered');
                     showMsg('Account created! Welcome ' + username + '!', 'green');
                     setTimeout(() => { window.location.href = '/static/index.html'; }, 1000);
                 } else {
