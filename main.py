@@ -23,6 +23,11 @@ load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
+# Brevo SMTP credentials (from environment variables)
+BREVO_SMTP_LOGIN = os.getenv("BREVO_SMTP_LOGIN")
+BREVO_SMTP_KEY = os.getenv("BREVO_SMTP_KEY")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+
 # MongoDB Connection
 mongo_client = MongoClient(os.getenv("MONGODB_URI"))
 db = mongo_client["farming_assistant"]
@@ -69,40 +74,35 @@ def chrome_devtools():
     return Response(status_code=204)
 
 
-# --- GMAIL SMTP INTEGRATION (SOLVES OTP BLOCKS FOR ALL RECIPIENTS) ---
+# --- BREVO SMTP EMAIL SENDING ---
 def send_otp_email(email: str, name: str, otp: str, subject: str):
-    sender_email = "farming.assistant.india@gmail.com"
-    # Replace the string below with your secure 16-character Google App Password (without spaces)
-    sender_password = "YOUR_16_DIGIT_GMAIL_APP_PASSWORD" 
-    
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"Farming Assistant <{sender_email}>"
-    msg["To"] = email
-
-    html_content = f"""
-    <div style="font-family:Arial,sans-serif;max-width:400px;margin:auto;
-                background:#f0f7f0;border-radius:12px;padding:30px;text-align:center">
-        <h2 style="color:#2d5e2d">🌾 Farming Assistant</h2>
-        <p style="color:#333">Hello <b>{name}</b>! Your verification code is:</p>
-        <div style="font-size:2.5rem;font-weight:bold;color:#2d5e2d;
-                    background:white;border-radius:8px;padding:20px;margin:20px 0;
-                    letter-spacing:8px">{otp}</div>
-        <p style="color:#666;font-size:0.9rem">This code expires in 10 minutes.</p>
-        <p style="color:#999;font-size:0.8rem">Do not share this code with anyone.</p>
-    </div>
-    """
-    msg.attach(MIMEText(html_content, "html"))
-
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()  # Upgrade secure transport connection layer
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, email, msg.as_string())
-        server.quit()
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"Farming Assistant <{SENDER_EMAIL}>"
+        msg["To"] = email
+
+        html_content = f"""
+        <div style="font-family:Arial,sans-serif;max-width:400px;margin:auto;
+                    background:#f0f7f0;border-radius:12px;padding:30px;text-align:center">
+            <h2 style="color:#2d5e2d">🌾 Farming Assistant</h2>
+            <p style="color:#333">Hello <b>{name}</b>! Your verification code is:</p>
+            <div style="font-size:2.5rem;font-weight:bold;color:#2d5e2d;
+                        background:white;border-radius:8px;padding:20px;margin:20px 0;
+                        letter-spacing:8px">{otp}</div>
+            <p style="color:#666;font-size:0.9rem">This code expires in 10 minutes.</p>
+            <p style="color:#999;font-size:0.8rem">Do not share this code with anyone.</p>
+        </div>
+        """
+        msg.attach(MIMEText(html_content, "html"))
+
+        with smtplib.SMTP("smtp-relay.brevo.com", 587) as server:
+            server.starttls()
+            server.login(BREVO_SMTP_LOGIN, BREVO_SMTP_KEY)
+            server.sendmail(SENDER_EMAIL, email, msg.as_string())
         return True
     except Exception as e:
-        print(f"Gmail SMTP Email delivery error: {e}")
+        print(f"Brevo SMTP email delivery error: {e}")
         return False
 
 
@@ -114,14 +114,12 @@ def send_otp(data: dict):
     name = data.get("name", "").strip()
     if not email or "@" not in email:
         return {"success": False, "message": "Invalid email address"}
-        
     otp = str(random.randint(100000, 999999))
     otp_store[email] = {"otp": otp, "time": time.time(), "name": name}
-    
     success = send_otp_email(email, name, otp, f"{otp} is your Farming Assistant OTP")
     if success:
         return {"success": True, "message": "OTP sent successfully"}
-    return {"success": False, "message": "Failed to send email setup via SMTP"}
+    return {"success": False, "message": "Failed to send email. Please try again."}
 
 
 @app.post("/verify-otp")
@@ -204,7 +202,7 @@ def forgot_password_otp(data: dict):
     )
     if success:
         return {"success": True, "message": "OTP sent to your email."}
-    return {"success": False, "message": "Failed to send email verification link."}
+    return {"success": False, "message": "Failed to send email."}
 
 
 @app.post("/forgot-password/reset")
