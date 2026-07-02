@@ -415,6 +415,9 @@ def serve_calendar(): return FileResponse("static/calendar.html")
 @app.get("/fertilizer.html", response_class=HTMLResponse)
 def serve_fertilizer(): return FileResponse("static/fertilizer.html")
 
+@app.get("/expenses.html", response_class=HTMLResponse)
+def serve_expenses(): return FileResponse("static/expenses.html")
+
 # --- CHAT ---
 
 @app.post("/chat")
@@ -658,6 +661,62 @@ Farmer Tip: [one practical tip]"""
         max_tokens=1024
     )
     return {"result": strip_think_tags(response.choices[0].message.content)}
+
+@app.post("/add-expense")
+def add_expense(data: dict):
+    username = data.get("username", "").strip()
+    entry_type = data.get("type", "").strip()  # "expense" or "income"
+    category = data.get("category", "").strip()
+    amount = data.get("amount")
+    note = data.get("note", "").strip()
+    crop = data.get("crop", "").strip()
+
+    if not username or not entry_type or not category or amount is None:
+        return {"success": False, "message": "Missing required fields."}
+    try:
+        amount = float(amount)
+    except:
+        return {"success": False, "message": "Invalid amount."}
+    if amount <= 0:
+        return {"success": False, "message": "Amount must be greater than 0."}
+
+    db["expenses"].insert_one({
+        "username": username,
+        "type": entry_type,
+        "category": category,
+        "amount": amount,
+        "note": note,
+        "crop": crop,
+        "timestamp": time.time()
+    })
+    return {"success": True, "message": "Entry added"}
+
+
+@app.get("/get-expenses")
+def get_expenses(username: str):
+    entries = list(db["expenses"].find(
+        {"username": username}, {"_id": 0}
+    ).sort("timestamp", -1))
+
+    total_income = sum(e["amount"] for e in entries if e["type"] == "income")
+    total_expense = sum(e["amount"] for e in entries if e["type"] == "expense")
+
+    return {
+        "entries": entries,
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "net_profit": total_income - total_expense
+    }
+
+
+@app.post("/delete-expense")
+def delete_expense(data: dict):
+    username = data.get("username", "").strip()
+    timestamp = data.get("timestamp")
+    if not username or timestamp is None:
+        return {"success": False, "message": "Missing data"}
+    db["expenses"].delete_one({"username": username, "timestamp": timestamp})
+    return {"success": True, "message": "Entry deleted"}
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

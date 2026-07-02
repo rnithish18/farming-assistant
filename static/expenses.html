@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker - Farming Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background-color: #f4f9f4; color: #1a3d1a; padding-bottom: 40px; }
+        header {
+            background: linear-gradient(135deg, #2d5e2d, #1b441b);
+            color: white; padding: 15px 20px;
+            display: flex; align-items: center; gap: 15px;
+        }
+        header a { color: white; text-decoration: none; font-size: 1.5rem; }
+        header h1 { font-size: 1.15rem; flex: 1; }
+        .lang-toggle {
+            display: flex; background: rgba(255,255,255,0.2);
+            border-radius: 20px; overflow: hidden;
+        }
+        .lang-toggle button {
+            background: none; border: none; color: white;
+            padding: 6px 12px; font-size: 0.85rem; cursor: pointer;
+        }
+        .lang-toggle button.active {
+            background: white; color: #2d5e2d; font-weight: bold;
+        }
+        .container { max-width: 550px; margin: 20px auto; padding: 0 20px; }
+
+        .summary-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+            margin-bottom: 20px;
+        }
+        .summary-card {
+            background: white; border-radius: 10px; padding: 14px 10px;
+            text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        .summary-card .label { font-size: 0.75rem; color: #666; margin-bottom: 4px; }
+        .summary-card .value { font-size: 1.1rem; font-weight: bold; }
+        .income-color { color: #2d7d2d; }
+        .expense-color { color: #c62828; }
+        .profit-color { color: #2d5e2d; }
+        .loss-color { color: #c62828; }
+
+        .form-box {
+            background: white; border-radius: 12px; padding: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px;
+        }
+        .form-box h3 { color: #2d5e2d; margin-bottom: 12px; font-size: 1rem; }
+        .type-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+        .type-toggle button {
+            flex: 1; padding: 10px; border: 2px solid #ccc; background: white;
+            border-radius: 8px; font-weight: bold; cursor: pointer; color: #666;
+        }
+        .type-toggle button.active-expense { border-color: #c62828; background: #fde8e8; color: #c62828; }
+        .type-toggle button.active-income { border-color: #2d7d2d; background: #e8f5e9; color: #2d7d2d; }
+
+        label { display: block; font-weight: bold; margin-bottom: 4px; color: #333; font-size: 0.85rem; }
+        input, select {
+            width: 100%; padding: 10px; border: 1.5px solid #ccc;
+            border-radius: 8px; font-size: 0.9rem; margin-bottom: 10px; font-family: inherit;
+        }
+        .input-row { display: flex; gap: 8px; align-items: center; }
+        .input-row input { flex: 1; margin-bottom: 0; }
+        .mic-btn {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: #2d5e2d; color: white; border: none;
+            font-size: 1.05rem; cursor: pointer; flex-shrink: 0; margin-bottom: 10px;
+        }
+        .mic-btn.recording { background: #cc0000; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+        .voice-status { text-align: center; color: #cc0000; font-size: 0.8rem; margin: -6px 0 10px; min-height: 16px; }
+
+        .btn-row { display: flex; gap: 8px; }
+        button.submit-btn {
+            flex: 1; padding: 12px; background: #2d5e2d; color: white;
+            border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.95rem;
+        }
+        button.submit-btn:hover { background: #1b5e20; }
+        button.speak-btn {
+            width: 44px; background: #1b441b; color: white; border: none;
+            border-radius: 8px; font-size: 1.1rem; cursor: pointer; flex-shrink: 0;
+        }
+        button.speak-btn.speaking { background: #cc0000; }
+
+        .entry {
+            background: white; border-radius: 10px; padding: 12px 14px;
+            margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .entry-left { flex: 1; }
+        .entry-category { font-weight: bold; font-size: 0.95rem; }
+        .entry-note { font-size: 0.8rem; color: #778b77; margin-top: 2px; }
+        .entry-date { font-size: 0.75rem; color: #aaa; margin-top: 2px; }
+        .entry-amount { font-weight: bold; font-size: 1rem; margin-right: 10px; }
+        .delete-btn {
+            background: none; border: none; color: #c62828; font-size: 1.1rem;
+            cursor: pointer; padding: 4px 8px;
+        }
+        .empty-msg { text-align: center; color: #999; padding: 20px; font-size: 0.9rem; }
+        #status-msg { text-align: center; font-weight: bold; font-size: 0.85rem; margin-top: 8px; min-height: 18px; }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/static/index.html">←</a>
+        <h1 id="pageTitle">💰 Expense Tracker</h1>
+        <div class="lang-toggle">
+            <button id="btnEn" class="active" onclick="setLang('en')">EN</button>
+            <button id="btnTa" onclick="setLang('ta')">தமிழ்</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="label" id="lblIncome">Income</div>
+                <div class="value income-color" id="totalIncome">₹0</div>
+            </div>
+            <div class="summary-card">
+                <div class="label" id="lblExpenses">Expenses</div>
+                <div class="value expense-color" id="totalExpense">₹0</div>
+            </div>
+            <div class="summary-card">
+                <div class="label" id="lblNetProfit">Net Profit</div>
+                <div class="value" id="netProfit">₹0</div>
+            </div>
+        </div>
+
+        <div class="form-box">
+            <h3 id="lblAddEntry">Add Entry</h3>
+            <div class="type-toggle">
+                <button id="btnExpense" class="active-expense" onclick="setType('expense')">➖ <span id="lblExpenseBtn">Expense</span></button>
+                <button id="btnIncome" onclick="setType('income')">➕ <span id="lblIncomeBtn">Income</span></button>
+            </div>
+
+            <label id="lblCategory">Category:</label>
+            <select id="category">
+                <option>Seeds</option>
+                <option>Fertilizer</option>
+                <option>Pesticide</option>
+                <option>Labor</option>
+                <option>Irrigation</option>
+                <option>Equipment</option>
+                <option>Transport</option>
+                <option>Crop Sale</option>
+                <option>Other</option>
+            </select>
+
+            <label id="lblAmount">Amount (₹):</label>
+            <input type="number" id="amount" placeholder="e.g. 1500" min="1">
+
+            <label id="lblCrop">Crop (optional):</label>
+            <input type="text" id="crop" placeholder="e.g. Rice">
+
+            <label id="lblNote">Note (optional):</label>
+            <div class="input-row">
+                <input type="text" id="note" placeholder="e.g. Bought urea from local shop">
+                <button class="mic-btn" id="micBtn" onclick="toggleVoice()">🎤</button>
+            </div>
+            <div class="voice-status" id="voiceStatus"></div>
+
+            <div class="btn-row">
+                <button class="submit-btn" onclick="addEntry()" id="lblAddBtn">Add Entry</button>
+                <button class="speak-btn" onclick="toggleSpeak()" id="speakBtn" title="Read summary aloud">🔊</button>
+            </div>
+            <p id="status-msg"></p>
+        </div>
+
+        <h3 style="margin-bottom:10px;color:#2d5e2d;" id="lblRecent">Recent Entries</h3>
+        <div id="entriesList"></div>
+    </div>
+
+    <script>
+        const username = localStorage.getItem('farmer_username') || 'Anonymous';
+        let currentType = 'expense';
+        let currentLang = 'en';
+        let recognition = null;
+        let isRecording = false;
+        let synth = window.speechSynthesis;
+        let isSpeaking = false;
+        let lastEntriesData = null;
+
+        const t = {
+            en: {
+                title: '💰 Expense Tracker', income: 'Income', expenses: 'Expenses', netProfit: 'Net Profit',
+                addEntry: 'Add Entry', expenseBtn: 'Expense', incomeBtn: 'Income', category: 'Category:',
+                amount: 'Amount (₹):', crop: 'Crop (optional):', note: 'Note (optional):',
+                notePlaceholder: 'e.g. Bought urea from local shop', addBtn: 'Add Entry', recent: 'Recent Entries',
+                voiceListening: '🔴 Listening... speak now', voiceDone: '✅ Got it!', empty: 'No entries yet. Add your first one above!'
+            },
+            ta: {
+                title: '💰 செலவு கண்காணிப்பு', income: 'வருமானம்', expenses: 'செலவுகள்', netProfit: 'நிகர லாபம்',
+                addEntry: 'உள்ளீடு சேர்க்கவும்', expenseBtn: 'செலவு', incomeBtn: 'வருமானம்', category: 'வகை:',
+                amount: 'தொகை (₹):', crop: 'பயிர் (விருப்பம்):', note: 'குறிப்பு (விருப்பம்):',
+                notePlaceholder: 'எ.கா. உள்ளூர் கடையில் இருந்து யூரியா வாங்கியது', addBtn: 'சேர்க்கவும்', recent: 'சமீபத்திய உள்ளீடுகள்',
+                voiceListening: '🔴 கேட்கிறேன்... இப்போது பேசுங்கள்', voiceDone: '✅ கிடைத்தது!', empty: 'இன்னும் உள்ளீடுகள் இல்லை. மேலே முதலில் சேர்க்கவும்!'
+            }
+        };
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.getElementById('pageTitle').textContent = t[lang].title;
+            document.getElementById('lblIncome').textContent = t[lang].income;
+            document.getElementById('lblExpenses').textContent = t[lang].expenses;
+            document.getElementById('lblNetProfit').textContent = t[lang].netProfit;
+            document.getElementById('lblAddEntry').textContent = t[lang].addEntry;
+            document.getElementById('lblExpenseBtn').textContent = t[lang].expenseBtn;
+            document.getElementById('lblIncomeBtn').textContent = t[lang].incomeBtn;
+            document.getElementById('lblCategory').textContent = t[lang].category;
+            document.getElementById('lblAmount').textContent = t[lang].amount;
+            document.getElementById('lblCrop').textContent = t[lang].crop;
+            document.getElementById('lblNote').textContent = t[lang].note;
+            document.getElementById('note').placeholder = t[lang].notePlaceholder;
+            document.getElementById('lblAddBtn').textContent = t[lang].addBtn;
+            document.getElementById('lblRecent').textContent = t[lang].recent;
+            document.getElementById('btnEn').classList.toggle('active', lang === 'en');
+            document.getElementById('btnTa').classList.toggle('active', lang === 'ta');
+            localStorage.setItem('app_lang', lang);
+            if (lastEntriesData) renderEntries(lastEntriesData);
+        }
+
+        const savedLang = localStorage.getItem('app_lang');
+        if (savedLang) setLang(savedLang);
+
+        function setType(type) {
+            currentType = type;
+            document.getElementById('btnExpense').classList.toggle('active-expense', type === 'expense');
+            document.getElementById('btnIncome').classList.toggle('active-income', type === 'income');
+        }
+
+        function toggleVoice() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Voice input not supported. Please use Chrome.');
+                return;
+            }
+            if (isRecording) { recognition.stop(); return; }
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SR();
+            recognition.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            recognition.interimResults = false;
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('micBtn').classList.add('recording');
+                document.getElementById('micBtn').textContent = '⏹';
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceListening;
+            };
+            recognition.onresult = (e) => {
+                document.getElementById('note').value = e.results[0][0].transcript;
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceDone;
+            };
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+            };
+            recognition.onerror = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+                document.getElementById('voiceStatus').textContent = '❌ Could not hear. Try again.';
+            };
+            recognition.start();
+        }
+
+        function toggleSpeak() {
+            if (isSpeaking) {
+                synth.cancel();
+                isSpeaking = false;
+                document.getElementById('speakBtn').classList.remove('speaking');
+                document.getElementById('speakBtn').textContent = '🔊';
+                return;
+            }
+            if (!lastEntriesData) { alert('No summary to read yet.'); return; }
+            const summary = currentLang === 'ta'
+                ? `மொத்த வருமானம் ரூபாய் ${lastEntriesData.total_income}. மொத்த செலவு ரூபாய் ${lastEntriesData.total_expense}. நிகர லாபம் ரூபாய் ${lastEntriesData.net_profit}.`
+                : `Total income is rupees ${lastEntriesData.total_income}. Total expenses are rupees ${lastEntriesData.total_expense}. Net profit is rupees ${lastEntriesData.net_profit}.`;
+            const utterance = new SpeechSynthesisUtterance(summary);
+            utterance.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            utterance.rate = 0.9;
+            utterance.onstart = () => {
+                isSpeaking = true;
+                document.getElementById('speakBtn').classList.add('speaking');
+                document.getElementById('speakBtn').textContent = '⏹';
+            };
+            utterance.onend = () => {
+                isSpeaking = false;
+                document.getElementById('speakBtn').classList.remove('speaking');
+                document.getElementById('speakBtn').textContent = '🔊';
+            };
+            synth.speak(utterance);
+        }
+
+        function renderEntries(data) {
+            document.getElementById('totalIncome').textContent = '₹' + data.total_income.toLocaleString('en-IN');
+            document.getElementById('totalExpense').textContent = '₹' + data.total_expense.toLocaleString('en-IN');
+            const netEl = document.getElementById('netProfit');
+            netEl.textContent = '₹' + data.net_profit.toLocaleString('en-IN');
+            netEl.className = 'value ' + (data.net_profit >= 0 ? 'profit-color' : 'loss-color');
+
+            const list = document.getElementById('entriesList');
+            if (data.entries.length === 0) {
+                list.innerHTML = `<div class="empty-msg">${t[currentLang].empty}</div>`;
+                return;
+            }
+            list.innerHTML = data.entries.map(e => `
+                <div class="entry">
+                    <div class="entry-left">
+                        <div class="entry-category">${e.category}${e.crop ? ' — ' + e.crop : ''}</div>
+                        ${e.note ? `<div class="entry-note">${e.note}</div>` : ''}
+                        <div class="entry-date">${new Date(e.timestamp * 1000).toLocaleDateString('en-IN')}</div>
+                    </div>
+                    <div class="entry-amount ${e.type === 'income' ? 'income-color' : 'expense-color'}">
+                        ${e.type === 'income' ? '+' : '-'}₹${e.amount.toLocaleString('en-IN')}
+                    </div>
+                    <button class="delete-btn" onclick="deleteEntry(${e.timestamp})">🗑️</button>
+                </div>
+            `).join('');
+        }
+
+        async function loadEntries() {
+            try {
+                const res = await fetch(`/get-expenses?username=${encodeURIComponent(username)}`);
+                const data = await res.json();
+                lastEntriesData = data;
+                renderEntries(data);
+            } catch (e) {
+                document.getElementById('entriesList').innerHTML = '<div class="empty-msg">Could not load entries.</div>';
+            }
+        }
+
+        async function addEntry() {
+            const category = document.getElementById('category').value;
+            const amount = document.getElementById('amount').value.trim();
+            const crop = document.getElementById('crop').value.trim();
+            const note = document.getElementById('note').value.trim();
+
+            if (!amount || amount <= 0) { showMsg('Please enter a valid amount.', 'red'); return; }
+
+            try {
+                const res = await fetch('/add-expense', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, type: currentType, category, amount, crop, note })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showMsg('Entry added!', 'green');
+                    document.getElementById('amount').value = '';
+                    document.getElementById('crop').value = '';
+                    document.getElementById('note').value = '';
+                    loadEntries();
+                } else {
+                    showMsg(data.message, 'red');
+                }
+            } catch (e) {
+                showMsg('Error: could not reach server.', 'red');
+            }
+        }
+
+        async function deleteEntry(timestamp) {
+            try {
+                await fetch('/delete-expense', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, timestamp })
+                });
+                loadEntries();
+            } catch (e) {}
+        }
+
+        function showMsg(text, color) {
+            const msg = document.getElementById('status-msg');
+            msg.textContent = text;
+            msg.style.color = color === 'red' ? '#d32f2f' : '#2d5e2d';
+            setTimeout(() => { msg.textContent = ''; }, 2500);
+        }
+
+        loadEntries();
+    </script>
+</body>
+</html>
