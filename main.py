@@ -412,6 +412,8 @@ def serve_profile(): return FileResponse("static/profile.html")
 @app.get("/calendar.html", response_class=HTMLResponse)
 def serve_calendar(): return FileResponse("static/calendar.html")
 
+@app.get("/fertilizer.html", response_class=HTMLResponse)
+def serve_fertilizer(): return FileResponse("static/fertilizer.html")
 
 # --- CHAT ---
 
@@ -625,6 +627,37 @@ def get_crop_calendar(crop: str, state: str = "Tamil Nadu", lang: str = "en", us
         max_tokens=1024
     )
     return {"calendar": strip_think_tags(response.choices[0].message.content)}
+
+@app.get("/fertilizer-calculator")
+def get_fertilizer_calculator(crop: str, land_size: float, land_unit: str = "acre", soil_type: str = "Loamy", growth_stage: str = "Sowing / Land Preparation", lang: str = "en", username: str = "Anonymous"):
+    if lang == "ta":
+        prompt = f"""{crop} பயிருக்கு {land_size} {land_unit} நிலப்பரப்பில், {soil_type} மண் வகையில், {growth_stage} கட்டத்தில் தேவையான உரத்தின் அளவை தமிழில் கணக்கிட்டுக் கொடுக்கவும்.
+
+இந்த வடிவத்தில் பதில் கொடுக்கவும்:
+நைட்ரஜன் (N): [அளவு] கிலோ
+பாஸ்பரஸ் (P): [அளவு] கிலோ
+பொட்டாசியம் (K): [அளவு] கிலோ
+பரிந்துரைக்கப்படும் உரங்கள்: [குறிப்பிட்ட உர பெயர்கள் மற்றும் அளவுகள்]
+பயன்படுத்தும் முறை: [எப்படி, எப்போது பயன்படுத்த வேண்டும்]
+விவசாயி குறிப்பு: [ஒரு நடைமுறை குறிப்பு]"""
+        system_msg = "நீங்கள் ஒரு இந்திய வேளாண் உர நிபுணர். துல்லியமான எண்களுடன் தமிழில் மட்டும் பதில் கொடுக்கவும்."
+    else:
+        prompt = f"""Calculate the fertilizer requirement for {crop} grown on {land_size} {land_unit} of land, with {soil_type} soil, currently at the {growth_stage} stage.
+
+Give the response in this exact format:
+Nitrogen (N): [amount] kg
+Phosphorus (P): [amount] kg
+Potassium (K): [amount] kg
+Recommended Fertilizers: [specific fertilizer names and quantities, e.g. Urea, DAP, MOP]
+Application Method: [how and when to apply]
+Farmer Tip: [one practical tip]"""
+        system_msg = "You are an Indian agricultural fertilizer expert. Give precise, practical calculations based on standard Indian crop fertilizer recommendations."
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
+        max_tokens=1024
+    )
+    return {"result": strip_think_tags(response.choices[0].message.content)}
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
