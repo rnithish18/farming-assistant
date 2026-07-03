@@ -25,6 +25,10 @@
         .lang-toggle button.active {
             background: white; color: #2d5e2d; font-weight: bold;
         }
+        .profile-bar {
+            background: #e8f5e9; padding: 10px 20px; text-align: right;
+            border-bottom: 1px solid #d0e2d0; font-size: 0.85rem; color: #1b441b;
+        }
         .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 0.9rem; }
         select, input {
@@ -61,6 +65,10 @@
             margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             white-space: pre-wrap; line-height: 1.8; display: none; font-size: 0.95rem;
         }
+        footer {
+            text-align: center; margin-top: 30px; padding: 14px;
+            font-size: 0.8rem; color: #777;
+        }
     </style>
 </head>
 <body>
@@ -72,6 +80,9 @@
             <button id="btnTa" onclick="setLang('ta')">தமிழ்</button>
         </div>
     </header>
+
+    <div class="profile-bar">👤 Farmer Profile: <b id="farmerName">Guest</b></div>
+
     <div class="container">
         <label id="lblSoil">Soil Type:</label>
         <div class="input-row">
@@ -114,7 +125,12 @@
         <div class="loading" id="loading">Finding best crops for you...</div>
         <div class="result-box" id="resultBox"></div>
     </div>
+
+    <footer>Developed by Nithish | Software Engineering Student</footer>
+
     <script>
+        document.getElementById('farmerName').textContent = localStorage.getItem('farmer_username') || 'Guest';
+
         let currentLang = 'en';
         let recognition = null;
         let isRecording = false;

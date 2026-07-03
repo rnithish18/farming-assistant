@@ -421,6 +421,9 @@ def serve_expenses(): return FileResponse("static/expenses.html")
 @app.get("/recommend.html", response_class=HTMLResponse)
 def serve_recommend(): return FileResponse("static/recommend.html")
 
+@app.get("/yield.html", response_class=HTMLResponse)
+def serve_yield(): return FileResponse("static/yield.html")
+
 # --- CHAT ---
 
 @app.post("/chat")
@@ -749,6 +752,35 @@ For each crop:
 
 Top Pick: [recommend one crop as the best choice and why]"""
         system_msg = "You are an expert Indian agricultural crop advisor helping farmers choose the most profitable and suitable crops for their conditions."
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
+        max_tokens=1024
+    )
+    return {"result": strip_think_tags(response.choices[0].message.content)}
+
+@app.get("/yield-prediction")
+def get_yield_prediction(crop: str, land_size: float, land_unit: str = "acre", soil_type: str = "Loamy", irrigation: str = "Rain-fed", lang: str = "en", username: str = "Anonymous"):
+    if lang == "ta":
+        prompt = f"""{crop} பயிருக்கு {land_size} {land_unit} நிலப்பரப்பில், {soil_type} மண் வகையில், {irrigation} நீர்ப்பாசன முறையில் எதிர்பார்க்கப்படும் மகசூலை தமிழில் மதிப்பிடவும்.
+
+இந்த வடிவத்தில் பதில் கொடுக்கவும்:
+மதிப்பிடப்பட்ட மகசூல்: [அளவு வரம்பு] (எ.கா. குவிண்டால் அல்லது டன்)
+சராசரி மகசூல் ஒப்பீடு: [இந்த பகுதியின் சராசரியுடன் ஒப்பிடுக]
+மகசூலை பாதிக்கும் காரணிகள்: [முக்கிய காரணிகள் பட்டியல்]
+மகசூலை மேம்படுத்த குறிப்புகள்: [2-3 நடைமுறை குறிப்புகள்]
+கணிப்பு நம்பகத்தன்மை: [குறிப்பு - இது ஒரு பொதுவான மதிப்பீடு, சரியான புள்ளிவிவரம் அல்ல]"""
+        system_msg = "தமிழில் மட்டும் பதில் கொடுக்கவும். இது ஒரு பொதுவான AI மதிப்பீடு என்பதை தெளிவுபடுத்தவும், துல்லியமான அறிவியல் கணிப்பு அல்ல."
+    else:
+        prompt = f"""Estimate the expected yield for {crop} grown on {land_size} {land_unit} of land, with {soil_type} soil, using {irrigation} irrigation.
+
+Give the response in this exact format:
+Estimated Yield: [range] (e.g. in quintals or tonnes)
+Comparison to Regional Average: [how it compares]
+Factors Affecting Yield: [list key factors]
+Tips to Improve Yield: [2-3 practical tips]
+Prediction Confidence: [note that this is a general AI estimate, not a precise scientific forecast]"""
+        system_msg = "You are an agricultural yield estimation assistant. Give a general, practical estimate based on typical Indian farming conditions. Always clarify this is an approximate AI estimate, not a precise scientific prediction."
     response = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],

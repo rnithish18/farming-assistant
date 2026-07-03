@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fertilizer Calculator - Farming Assistant</title>
+    <title>Yield Prediction - Farming Assistant</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background-color: #f4f9f4; color: #1a3d1a; }
@@ -13,7 +13,7 @@
             display: flex; align-items: center; gap: 15px;
         }
         header a { color: white; text-decoration: none; font-size: 1.5rem; }
-        header h1 { font-size: 1.2rem; flex: 1; }
+        header h1 { font-size: 1.1rem; flex: 1; }
         .lang-toggle {
             display: flex; background: rgba(255,255,255,0.2);
             border-radius: 20px; overflow: hidden;
@@ -67,6 +67,9 @@
             margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             white-space: pre-wrap; line-height: 1.8; display: none; font-size: 0.95rem;
         }
+        .disclaimer {
+            font-size: 0.75rem; color: #999; text-align: center; margin-top: 10px;
+        }
         footer {
             text-align: center; margin-top: 30px; padding: 14px;
             font-size: 0.8rem; color: #777;
@@ -76,7 +79,7 @@
 <body>
     <header>
         <a href="/static/index.html">←</a>
-        <h1 id="pageTitle">🧪 Fertilizer Calculator</h1>
+        <h1 id="pageTitle">📈 Yield Prediction</h1>
         <div class="lang-toggle">
             <button id="btnEn" class="active" onclick="setLang('en')">EN</button>
             <button id="btnTa" onclick="setLang('ta')">தமிழ்</button>
@@ -88,7 +91,7 @@
     <div class="container">
         <label id="lblCrop">Crop Name:</label>
         <div class="input-row">
-            <input type="text" id="cropInput" placeholder="e.g. Rice, Tomato, Sugarcane">
+            <input type="text" id="cropInput" placeholder="e.g. Rice, Cotton, Sugarcane">
             <button class="mic-btn" id="micBtn" onclick="toggleVoice()">🎤</button>
         </div>
         <div class="voice-status" id="voiceStatus"></div>
@@ -110,29 +113,31 @@
 
         <label id="lblSoil">Soil Type:</label>
         <select id="soilType">
-            <option value="Loamy">Loamy</option>
-            <option value="Clay">Clay</option>
-            <option value="Sandy">Sandy</option>
-            <option value="Black (Regur)">Black (Regur)</option>
-            <option value="Red">Red</option>
-            <option value="Alluvial">Alluvial</option>
+            <option>Loamy</option>
+            <option>Clay</option>
+            <option>Sandy</option>
+            <option>Black (Regur)</option>
+            <option>Red</option>
+            <option>Alluvial</option>
         </select>
 
-        <label id="lblStage">Growth Stage:</label>
-        <select id="growthStage">
-            <option value="Sowing / Land Preparation">Sowing / Land Preparation</option>
-            <option value="Vegetative Growth">Vegetative Growth</option>
-            <option value="Flowering">Flowering</option>
-            <option value="Fruiting / Grain Filling">Fruiting / Grain Filling</option>
+        <label id="lblIrrigation">Irrigation Method:</label>
+        <select id="irrigation">
+            <option>Rain-fed</option>
+            <option>Canal</option>
+            <option>Borewell</option>
+            <option>Drip Irrigation</option>
+            <option>Sprinkler</option>
         </select>
 
         <div class="btn-row">
-            <button class="main-btn" id="calcBtn" onclick="calculateFertilizer()">Calculate Fertilizer</button>
+            <button class="main-btn" id="predictBtn" onclick="getPrediction()">Predict Yield</button>
             <button class="speak-btn" id="speakBtn" onclick="toggleSpeak()" title="Read aloud">🔊</button>
         </div>
 
-        <div class="loading" id="loading">Calculating fertilizer requirements...</div>
+        <div class="loading" id="loading">Estimating your yield...</div>
         <div class="result-box" id="resultBox"></div>
+        <p class="disclaimer" id="disclaimer">This is a general AI estimate, not a precise scientific forecast.</p>
     </div>
 
     <footer>Developed by Nithish | Software Engineering Student</footer>
@@ -149,30 +154,18 @@
 
         const t = {
             en: {
-                title: '🧪 Fertilizer Calculator',
-                crop: 'Crop Name:',
-                landSize: 'Land Size:',
-                unit: 'Unit:',
-                soil: 'Soil Type:',
-                stage: 'Growth Stage:',
-                cropPlaceholder: 'e.g. Rice, Tomato, Sugarcane',
-                btn: 'Calculate Fertilizer',
-                loading: 'Calculating fertilizer requirements...',
-                voiceListening: '🔴 Listening... speak now',
-                voiceDone: '✅ Got it!'
+                title: '📈 Yield Prediction', crop: 'Crop Name:', landSize: 'Land Size:', unit: 'Unit:',
+                soil: 'Soil Type:', irrigation: 'Irrigation Method:', cropPlaceholder: 'e.g. Rice, Cotton, Sugarcane',
+                btn: 'Predict Yield', loading: 'Estimating your yield...',
+                voiceListening: '🔴 Listening... speak now', voiceDone: '✅ Got it!',
+                disclaimer: 'This is a general AI estimate, not a precise scientific forecast.'
             },
             ta: {
-                title: '🧪 உர கணக்கீட்டாளர்',
-                crop: 'பயிர் பெயர்:',
-                landSize: 'நிலப்பரப்பு:',
-                unit: 'அளவு அலகு:',
-                soil: 'மண் வகை:',
-                stage: 'வளர்ச்சி கட்டம்:',
-                cropPlaceholder: 'எ.கா. நெல், தக்காளி, கரும்பு',
-                btn: 'உரம் கணக்கிடவும்',
-                loading: 'உர தேவையை கணக்கிடுகிறது...',
-                voiceListening: '🔴 கேட்கிறேன்... இப்போது பேசுங்கள்',
-                voiceDone: '✅ கிடைத்தது!'
+                title: '📈 மகசூல் கணிப்பு', crop: 'பயிர் பெயர்:', landSize: 'நிலப்பரப்பு:', unit: 'அளவு அலகு:',
+                soil: 'மண் வகை:', irrigation: 'நீர்ப்பாசன முறை:', cropPlaceholder: 'எ.கா. நெல், பருத்தி, கரும்பு',
+                btn: 'மகசூலை கணிக்கவும்', loading: 'மகசூலை மதிப்பிடுகிறது...',
+                voiceListening: '🔴 கேட்கிறேன்... இப்போது பேசுங்கள்', voiceDone: '✅ கிடைத்தது!',
+                disclaimer: 'இது ஒரு பொதுவான AI மதிப்பீடு, சரியான அறிவியல் கணிப்பு அல்ல.'
             }
         };
 
@@ -183,10 +176,11 @@
             document.getElementById('lblLandSize').textContent = t[lang].landSize;
             document.getElementById('lblUnit').textContent = t[lang].unit;
             document.getElementById('lblSoil').textContent = t[lang].soil;
-            document.getElementById('lblStage').textContent = t[lang].stage;
+            document.getElementById('lblIrrigation').textContent = t[lang].irrigation;
             document.getElementById('cropInput').placeholder = t[lang].cropPlaceholder;
-            document.getElementById('calcBtn').textContent = t[lang].btn;
+            document.getElementById('predictBtn').textContent = t[lang].btn;
             document.getElementById('loading').textContent = t[lang].loading;
+            document.getElementById('disclaimer').textContent = t[lang].disclaimer;
             document.getElementById('btnEn').classList.toggle('active', lang === 'en');
             document.getElementById('btnTa').classList.toggle('active', lang === 'ta');
             localStorage.setItem('app_lang', lang);
@@ -237,7 +231,7 @@
                 document.getElementById('speakBtn').textContent = '🔊';
                 return;
             }
-            if (!lastResult) { alert('No result to read. Please calculate first.'); return; }
+            if (!lastResult) { alert('No result to read. Please predict first.'); return; }
             const utterance = new SpeechSynthesisUtterance(lastResult);
             utterance.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
             utterance.rate = 0.9;
@@ -254,13 +248,13 @@
             synth.speak(utterance);
         }
 
-        async function calculateFertilizer() {
+        async function getPrediction() {
             const crop = document.getElementById('cropInput').value.trim();
             const landSize = document.getElementById('landSize').value.trim();
             const landUnit = document.getElementById('landUnit').value;
             const soilType = document.getElementById('soilType').value;
-            const growthStage = document.getElementById('growthStage').value;
-            const btn = document.getElementById('calcBtn');
+            const irrigation = document.getElementById('irrigation').value;
+            const btn = document.getElementById('predictBtn');
             const loading = document.getElementById('loading');
             const resultBox = document.getElementById('resultBox');
             const username = localStorage.getItem('farmer_username') || 'Anonymous';
@@ -278,10 +272,10 @@
             try {
                 const params = new URLSearchParams({
                     crop, land_size: landSize, land_unit: landUnit,
-                    soil_type: soilType, growth_stage: growthStage,
+                    soil_type: soilType, irrigation,
                     lang: currentLang, username
                 });
-                const response = await fetch(`/fertilizer-calculator?${params}`);
+                const response = await fetch(`/yield-prediction?${params}`);
                 const data = await response.json();
                 lastResult = data.result;
                 resultBox.textContent = data.result;

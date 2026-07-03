@@ -25,6 +25,10 @@
         .lang-toggle button.active {
             background: white; color: #2d5e2d; font-weight: bold;
         }
+        .profile-bar {
+            background: #e8f5e9; padding: 10px 20px; text-align: right;
+            border-bottom: 1px solid #d0e2d0; font-size: 0.85rem; color: #1b441b;
+        }
         .container { max-width: 550px; margin: 20px auto; padding: 0 20px; }
 
         .summary-grid {
@@ -99,6 +103,10 @@
         }
         .empty-msg { text-align: center; color: #999; padding: 20px; font-size: 0.9rem; }
         #status-msg { text-align: center; font-weight: bold; font-size: 0.85rem; margin-top: 8px; min-height: 18px; }
+        footer {
+            text-align: center; margin-top: 30px; padding: 14px;
+            font-size: 0.8rem; color: #777;
+        }
     </style>
 </head>
 <body>
@@ -110,6 +118,8 @@
             <button id="btnTa" onclick="setLang('ta')">தமிழ்</button>
         </div>
     </header>
+
+    <div class="profile-bar">👤 Farmer Profile: <b id="farmerName">Guest</b></div>
 
     <div class="container">
         <div class="summary-grid">
@@ -171,7 +181,11 @@
         <div id="entriesList"></div>
     </div>
 
+    <footer>Developed by Nithish | Software Engineering Student</footer>
+
     <script>
+        document.getElementById('farmerName').textContent = localStorage.getItem('farmer_username') || 'Guest';
+
         const username = localStorage.getItem('farmer_username') || 'Anonymous';
         let currentType = 'expense';
         let currentLang = 'en';
