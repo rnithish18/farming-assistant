@@ -178,7 +178,13 @@
         </div>
 
         <div class="history-section">
-            <h3 style="margin-bottom: 12px;">🕒 Recent Activity Logs</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                <h3>🕒 Recent Activity Logs</h3>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="downloadHistory()" style="padding:6px 12px;background:#2d5e2d;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:bold;">⬇️ Download</button>
+                    <button onclick="clearHistory()" style="padding:6px 12px;background:#c62828;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:bold;">🗑️ Clear</button>
+                </div>
+            </div>
             <div id="historyLogs" style="color: #666; font-size: 0.9rem;">Fetching logs...</div>
         </div>
     </div>
@@ -234,13 +240,16 @@
             window.location.href = "/static/login.html";
         }
 
+        let lastHistoryData = [];
+
         async function loadHistory(name) {
             const container = document.getElementById("historyLogs");
             try {
                 const response = await fetch(`/get-logs?username=${encodeURIComponent(name)}`);
                 const data = await response.json();
-                if (data.history && data.history.length > 0) {
-                    container.innerHTML = data.history.map(item => `
+                lastHistoryData = data.history || [];
+                if (lastHistoryData.length > 0) {
+                    container.innerHTML = lastHistoryData.map(item => `
                         <div class="history-item">
                             <div>
                                 <span class="history-tag">${item.feature}</span>
@@ -254,6 +263,48 @@
                 }
             } catch (err) {
                 container.textContent = "Could not fetch activity logs.";
+            }
+        }
+
+        function downloadHistory() {
+            if (!lastHistoryData || lastHistoryData.length === 0) {
+                alert("No activity to download yet.");
+                return;
+            }
+            let csv = "Feature,Details,Date & Time\n";
+            lastHistoryData.forEach(item => {
+                const date = new Date(item.time * 1000).toLocaleString('en-IN');
+                const safeQuery = String(item.query).replace(/"/g, '""');
+                csv += `"${item.feature}","${safeQuery}","${date}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `farming_activity_${savedUser}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function clearHistory() {
+            if (!confirm("Clear all your activity history? This cannot be undone.")) return;
+            try {
+                const res = await fetch('/clear-logs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: savedUser })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    lastHistoryData = [];
+                    document.getElementById('historyLogs').textContent = "No activity recorded yet.";
+                } else {
+                    alert("Could not clear history.");
+                }
+            } catch (e) {
+                alert("Error: could not reach server.");
             }
         }
     </script>

@@ -358,6 +358,15 @@ def save_user_log(request: LogRequest):
         return {"status": "error", "message": str(e)}
 
 
+@app.post("/clear-logs")
+def clear_user_logs(data: dict):
+    username = data.get("username", "").strip()
+    if not username:
+        return {"success": False, "message": "Missing username"}
+    db["activity_logs"].delete_many({"username": username})
+    return {"success": True, "message": "History cleared"}
+
+
 @app.get("/get-logs")
 def get_user_logs(username: str):
     try:
