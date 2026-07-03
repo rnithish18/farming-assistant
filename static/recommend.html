@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crop Recommendation - Farming Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background-color: #f4f9f4; color: #1a3d1a; }
+        header {
+            background: linear-gradient(135deg, #2d5e2d, #1b441b);
+            color: white; padding: 15px 20px;
+            display: flex; align-items: center; gap: 15px;
+        }
+        header a { color: white; text-decoration: none; font-size: 1.5rem; }
+        header h1 { font-size: 1.15rem; flex: 1; }
+        .lang-toggle {
+            display: flex; background: rgba(255,255,255,0.2);
+            border-radius: 20px; overflow: hidden;
+        }
+        .lang-toggle button {
+            background: none; border: none; color: white;
+            padding: 6px 12px; font-size: 0.85rem; cursor: pointer;
+        }
+        .lang-toggle button.active {
+            background: white; color: #2d5e2d; font-weight: bold;
+        }
+        .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 0.9rem; }
+        select, input {
+            width: 100%; padding: 12px; border: 1.5px solid #ccc;
+            border-radius: 8px; font-size: 0.95rem; margin-bottom: 14px;
+            font-family: inherit; background: white;
+        }
+        .input-row { display: flex; gap: 8px; align-items: flex-start; }
+        .input-row input { flex: 1; }
+        .mic-btn {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: #2d5e2d; color: white; border: none;
+            font-size: 1.2rem; cursor: pointer; flex-shrink: 0;
+        }
+        .mic-btn.recording { background: #cc0000; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+        .voice-status { text-align: center; color: #cc0000; font-size: 0.85rem; margin: -8px 0 10px; min-height: 18px; }
+        .btn-row { display: flex; gap: 10px; }
+        button.main-btn {
+            flex: 1; padding: 14px; background-color: #2d5e2d;
+            color: white; border: none; border-radius: 8px;
+            font-size: 1.05rem; cursor: pointer;
+        }
+        button.main-btn:disabled { background-color: #999; }
+        button.speak-btn {
+            width: 48px; height: 48px; background: #1b441b;
+            color: white; border: none; border-radius: 8px;
+            font-size: 1.2rem; cursor: pointer; flex-shrink: 0;
+        }
+        button.speak-btn.speaking { background: #cc0000; }
+        .loading { text-align: center; margin-top: 20px; color: #555; display: none; }
+        .result-box {
+            background: white; border-radius: 12px; padding: 20px;
+            margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: pre-wrap; line-height: 1.8; display: none; font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/static/index.html">←</a>
+        <h1 id="pageTitle">🌾 Crop Recommendation</h1>
+        <div class="lang-toggle">
+            <button id="btnEn" class="active" onclick="setLang('en')">EN</button>
+            <button id="btnTa" onclick="setLang('ta')">தமிழ்</button>
+        </div>
+    </header>
+    <div class="container">
+        <label id="lblSoil">Soil Type:</label>
+        <div class="input-row">
+            <select id="soilType" style="flex:1;">
+                <option>Loamy</option>
+                <option>Clay</option>
+                <option>Sandy</option>
+                <option>Black (Regur)</option>
+                <option>Red</option>
+                <option>Alluvial</option>
+            </select>
+        </div>
+
+        <label id="lblSeason">Season:</label>
+        <select id="season">
+            <option>Kharif (Monsoon)</option>
+            <option>Rabi (Winter)</option>
+            <option>Zaid (Summer)</option>
+        </select>
+
+        <label id="lblState">State:</label>
+        <div class="input-row">
+            <input type="text" id="stateInput" placeholder="e.g. Tamil Nadu" value="Tamil Nadu">
+            <button class="mic-btn" id="micBtn" onclick="toggleVoice()">🎤</button>
+        </div>
+        <div class="voice-status" id="voiceStatus"></div>
+
+        <label id="lblWater">Water Availability:</label>
+        <select id="waterAvailability">
+            <option>Low</option>
+            <option selected>Medium</option>
+            <option>High</option>
+        </select>
+
+        <div class="btn-row">
+            <button class="main-btn" id="recBtn" onclick="getRecommendation()">Get Recommendation</button>
+            <button class="speak-btn" id="speakBtn" onclick="toggleSpeak()" title="Read aloud">🔊</button>
+        </div>
+
+        <div class="loading" id="loading">Finding best crops for you...</div>
+        <div class="result-box" id="resultBox"></div>
+    </div>
+    <script>
+        let currentLang = 'en';
+        let recognition = null;
+        let isRecording = false;
+        let synth = window.speechSynthesis;
+        let isSpeaking = false;
+        let lastResult = '';
+
+        const t = {
+            en: {
+                title: '🌾 Crop Recommendation', soil: 'Soil Type:', season: 'Season:', state: 'State:',
+                water: 'Water Availability:', statePlaceholder: 'e.g. Tamil Nadu',
+                btn: 'Get Recommendation', loading: 'Finding best crops for you...',
+                voiceListening: '🔴 Listening... speak now', voiceDone: '✅ Got it!'
+            },
+            ta: {
+                title: '🌾 பயிர் பரிந்துரை', soil: 'மண் வகை:', season: 'பருவம்:', state: 'மாநிலம்:',
+                water: 'நீர் கிடைக்கும் நிலை:', statePlaceholder: 'எ.கா. தமிழ்நாடு',
+                btn: 'பரிந்துரை பெறவும்', loading: 'சிறந்த பயிர்களை தேடுகிறது...',
+                voiceListening: '🔴 கேட்கிறேன்... இப்போது பேசுங்கள்', voiceDone: '✅ கிடைத்தது!'
+            }
+        };
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.getElementById('pageTitle').textContent = t[lang].title;
+            document.getElementById('lblSoil').textContent = t[lang].soil;
+            document.getElementById('lblSeason').textContent = t[lang].season;
+            document.getElementById('lblState').textContent = t[lang].state;
+            document.getElementById('lblWater').textContent = t[lang].water;
+            document.getElementById('stateInput').placeholder = t[lang].statePlaceholder;
+            document.getElementById('recBtn').textContent = t[lang].btn;
+            document.getElementById('loading').textContent = t[lang].loading;
+            document.getElementById('btnEn').classList.toggle('active', lang === 'en');
+            document.getElementById('btnTa').classList.toggle('active', lang === 'ta');
+            localStorage.setItem('app_lang', lang);
+        }
+
+        const savedLang = localStorage.getItem('app_lang');
+        if (savedLang) setLang(savedLang);
+
+        function toggleVoice() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Voice input not supported. Please use Chrome.');
+                return;
+            }
+            if (isRecording) { recognition.stop(); return; }
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SR();
+            recognition.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            recognition.interimResults = false;
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('micBtn').classList.add('recording');
+                document.getElementById('micBtn').textContent = '⏹';
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceListening;
+            };
+            recognition.onresult = (e) => {
+                document.getElementById('stateInput').value = e.results[0][0].transcript;
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceDone;
+            };
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+            };
+            recognition.onerror = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+                document.getElementById('voiceStatus').textContent = '❌ Could not hear. Try again.';
+            };
+            recognition.start();
+        }
+
+        function toggleSpeak() {
+            if (isSpeaking) {
+                synth.cancel();
+                isSpeaking = false;
+                document.getElementById('speakBtn').classList.remove('speaking');
+                document.getElementById('speakBtn').textContent = '🔊';
+                return;
+            }
+            if (!lastResult) { alert('No result to read. Please get a recommendation first.'); return; }
+            const utterance = new SpeechSynthesisUtterance(lastResult);
+            utterance.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            utterance.rate = 0.9;
+            utterance.onstart = () => {
+                isSpeaking = true;
+                document.getElementById('speakBtn').classList.add('speaking');
+                document.getElementById('speakBtn').textContent = '⏹';
+            };
+            utterance.onend = () => {
+                isSpeaking = false;
+                document.getElementById('speakBtn').classList.remove('speaking');
+                document.getElementById('speakBtn').textContent = '🔊';
+            };
+            synth.speak(utterance);
+        }
+
+        async function getRecommendation() {
+            const soilType = document.getElementById('soilType').value;
+            const season = document.getElementById('season').value;
+            const state = document.getElementById('stateInput').value.trim();
+            const waterAvailability = document.getElementById('waterAvailability').value;
+            const btn = document.getElementById('recBtn');
+            const loading = document.getElementById('loading');
+            const resultBox = document.getElementById('resultBox');
+            const username = localStorage.getItem('farmer_username') || 'Anonymous';
+
+            if (!state) { alert('Please enter a state.'); return; }
+
+            if (isSpeaking) { synth.cancel(); isSpeaking = false; }
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            resultBox.style.display = 'none';
+            document.getElementById('voiceStatus').textContent = '';
+
+            try {
+                const params = new URLSearchParams({
+                    soil_type: soilType, season, state,
+                    water_availability: waterAvailability,
+                    lang: currentLang, username
+                });
+                const response = await fetch(`/crop-recommendation?${params}`);
+                const data = await response.json();
+                lastResult = data.result;
+                resultBox.textContent = data.result;
+                resultBox.style.display = 'block';
+            } catch (e) {
+                resultBox.textContent = 'Error: could not reach the server.';
+                resultBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

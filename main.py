@@ -418,6 +418,9 @@ def serve_fertilizer(): return FileResponse("static/fertilizer.html")
 @app.get("/expenses.html", response_class=HTMLResponse)
 def serve_expenses(): return FileResponse("static/expenses.html")
 
+@app.get("/recommend.html", response_class=HTMLResponse)
+def serve_recommend(): return FileResponse("static/recommend.html")
+
 # --- CHAT ---
 
 @app.post("/chat")
@@ -718,5 +721,39 @@ def delete_expense(data: dict):
     db["expenses"].delete_one({"username": username, "timestamp": timestamp})
     return {"success": True, "message": "Entry deleted"}
 
+@app.get("/crop-recommendation")
+def get_crop_recommendation(soil_type: str, season: str, state: str = "Tamil Nadu", water_availability: str = "Medium", lang: str = "en", username: str = "Anonymous"):
+    if lang == "ta":
+        prompt = f"""{state}வில், {soil_type} மண் வகையில், {season} பருவத்தில், {water_availability} நீர் கிடைக்கும் நிலையில் சிறந்த 3-4 பயிர்களை பரிந்துரைக்கவும். தமிழில் பதிலளிக்கவும்.
+
+இந்த வடிவத்தில் பதில் கொடுக்கவும்:
+பரிந்துரைக்கப்படும் பயிர்கள்: [பயிர் பெயர்கள் பட்டியல்]
+
+ஒவ்வொரு பயிருக்கும்:
+- ஏன் இது பொருத்தமானது
+- எதிர்பார்க்கப்படும் வருமானம் (உயர்/நடுத்தர/குறைவு)
+- வளர்ச்சி காலம்
+
+சிறந்த தேர்வு: [ஒரு பயிரை முதன்மையாக பரிந்துரைக்கவும் மற்றும் ஏன்]"""
+        system_msg = "தமிழில் மட்டும் பதில் கொடுக்கவும்."
+    else:
+        prompt = f"""Recommend the best 3-4 crops to grow in {state}, India with {soil_type} soil, during {season} season, with {water_availability} water availability.
+
+Give the response in this exact format:
+Recommended Crops: [list of crop names]
+
+For each crop:
+- Why it's suitable
+- Expected profitability (High/Medium/Low)
+- Growth duration
+
+Top Pick: [recommend one crop as the best choice and why]"""
+        system_msg = "You are an expert Indian agricultural crop advisor helping farmers choose the most profitable and suitable crops for their conditions."
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
+        max_tokens=1024
+    )
+    return {"result": strip_think_tags(response.choices[0].message.content)}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
