@@ -13,6 +13,7 @@ import bcrypt
 from dotenv import load_dotenv
 import requests
 from pymongo import MongoClient
+from bson import ObjectId
 
 # --- SMTP EMAIL IMPORTS ---
 import smtplib
@@ -453,6 +454,9 @@ def serve_recommend(): return FileResponse("static/recommend.html")
 @app.get("/yield.html", response_class=HTMLResponse)
 def serve_yield(): return FileResponse("static/yield.html")
 
+@app.get("/community.html", response_class=HTMLResponse)
+def serve_community(): return FileResponse("static/community.html")
+
 # --- CHAT ---
 
 @app.post("/chat")
@@ -837,5 +841,90 @@ Prediction Confidence: [note that this is a general AI estimate, not a precise s
     result = strip_think_tags(response.choices[0].message.content)
     log_activity(username, "Yield Prediction", f"Crop: {crop}, {land_size} {land_unit}, {irrigation}", result)
     return {"result": result}
+
+
+# --- COMMUNITY Q&A ---
+
+@app.post("/community/ask")
+def post_question(data: dict):
+    username = data.get("username", "Anonymous").strip()
+    question = data.get("question", "").strip()
+    lang = data.get("lang", "en")
+    if not question:
+        return {"success": False, "message": "Please enter a question."}
+    doc = {
+        "username": username,
+        "question": question,
+        "lang": lang,
+        "timestamp": time.time(),
+        "answers": []
+    }
+    result = db["community"].insert_one(doc)
+    log_activity(username, "Community Q&A", f"Asked: {question[:60]}")
+    return {"success": True, "message": "Question posted", "id": str(result.inserted_id)}
+
+
+@app.get("/community/questions")
+def get_questions(limit: int = 30):
+    posts = list(db["community"].find().sort("timestamp", -1).limit(limit))
+    for p in posts:
+        p["id"] = str(p["_id"])
+        del p["_id"]
+    return {"questions": posts}
+
+
+@app.post("/community/answer")
+def post_answer(data: dict):
+    question_id = data.get("question_id", "").strip()
+    username = data.get("username", "Anonymous").strip()
+    answer = data.get("answer", "").strip()
+    if not question_id or not answer:
+        return {"success": False, "message": "Missing data"}
+    db["community"].update_one(
+        {"_id": ObjectId(question_id)},
+        {"$push": {"answers": {"username": username, "answer": answer, "timestamp": time.time()}}}
+    )
+    return {"success": True, "message": "Answer posted"}
+
+
+@app.post("/community/ai-answer")
+def get_ai_answer(data: dict):
+    question_id = data.get("question_id", "").strip()
+    question_text = data.get("question", "").strip()
+    lang = data.get("lang", "en")
+    if not question_text:
+        return {"success": False, "message": "Missing question"}
+    if lang == "ta":
+        system_msg = "நீங்கள் இந்திய விவசாயிகளுக்கு உதவும் ஒரு பயனுள்ள வேளாண் உதவியாளர். தமிழில் மட்டும், சுருக்கமாகவும் நடைமுறையாகவும் பதிலளிக்கவும்."
+    else:
+        system_msg = "You are a helpful farming assistant for Indian farmers. Answer briefly and practically in English only."
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": question_text}],
+        max_tokens=512
+    )
+    answer = strip_think_tags(response.choices[0].message.content)
+    if question_id:
+        db["community"].update_one(
+            {"_id": ObjectId(question_id)},
+            {"$push": {"answers": {"username": "🤖 AI Assistant", "answer": answer, "timestamp": time.time()}}}
+        )
+    return {"success": True, "answer": answer}
+
+
+@app.post("/community/delete")
+def delete_question(data: dict):
+    question_id = data.get("question_id", "").strip()
+    username = data.get("username", "").strip()
+    if not question_id:
+        return {"success": False, "message": "Missing data"}
+    post = db["community"].find_one({"_id": ObjectId(question_id)})
+    if not post:
+        return {"success": False, "message": "Not found"}
+    if post.get("username") != username:
+        return {"success": False, "message": "You can only delete your own question"}
+    db["community"].delete_one({"_id": ObjectId(question_id)})
+    return {"success": True, "message": "Deleted"}
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

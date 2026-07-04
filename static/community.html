@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Q&A - Farming Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background-color: #f4f9f4; color: #1a3d1a; }
+        header {
+            background: linear-gradient(135deg, #2d5e2d, #1b441b);
+            color: white; padding: 15px 20px;
+            display: flex; align-items: center; gap: 15px;
+        }
+        header a { color: white; text-decoration: none; font-size: 1.5rem; }
+        header h1 { font-size: 1.2rem; flex: 1; }
+        .lang-toggle {
+            display: flex; background: rgba(255,255,255,0.2);
+            border-radius: 20px; overflow: hidden;
+        }
+        .lang-toggle button {
+            background: none; border: none; color: white;
+            padding: 6px 12px; font-size: 0.85rem; cursor: pointer;
+        }
+        .lang-toggle button.active {
+            background: white; color: #2d5e2d; font-weight: bold;
+        }
+        .profile-bar {
+            background: #e8f5e9; padding: 10px 20px; text-align: right;
+            border-bottom: 1px solid #d0e2d0; font-size: 0.85rem; color: #1b441b;
+        }
+        .container { max-width: 600px; margin: 20px auto; padding: 0 20px; }
+
+        .ask-box {
+            background: white; border-radius: 12px; padding: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px;
+        }
+        .ask-box h3 { color: #2d5e2d; margin-bottom: 10px; font-size: 1rem; }
+        .input-row { display: flex; gap: 8px; align-items: flex-start; }
+        textarea {
+            flex: 1; padding: 10px; border: 1.5px solid #ccc; border-radius: 8px;
+            font-size: 0.9rem; font-family: inherit; resize: vertical; min-height: 60px;
+        }
+        .mic-btn {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: #2d5e2d; color: white; border: none;
+            font-size: 1.05rem; cursor: pointer; flex-shrink: 0;
+        }
+        .mic-btn.recording { background: #cc0000; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+        .voice-status { text-align: center; color: #cc0000; font-size: 0.8rem; margin: 6px 0; min-height: 16px; }
+        button.post-btn {
+            width: 100%; padding: 11px; background: #2d5e2d; color: white;
+            border: none; border-radius: 8px; font-weight: bold; cursor: pointer;
+            font-size: 0.95rem; margin-top: 8px;
+        }
+        button.post-btn:hover { background: #1b5e20; }
+        #status-msg { text-align: center; font-weight: bold; font-size: 0.85rem; margin-top: 8px; min-height: 18px; }
+
+        .question-card {
+            background: white; border-radius: 12px; padding: 16px;
+            margin-bottom: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        .q-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+        .q-user { font-weight: bold; color: #2d5e2d; font-size: 0.85rem; }
+        .q-time { color: #999; font-size: 0.75rem; }
+        .q-text { font-size: 0.95rem; margin-bottom: 10px; line-height: 1.5; }
+        .q-actions { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+        .q-actions button {
+            padding: 5px 10px; border-radius: 6px; border: 1px solid #2d5e2d;
+            background: white; color: #2d5e2d; font-size: 0.8rem; cursor: pointer;
+        }
+        .q-actions button.ai-btn { background: #fff8e1; border-color: #f59e0b; color: #92400e; }
+        .q-actions button.delete-btn { border-color: #c62828; color: #c62828; }
+        .q-actions button.speak-btn { border-color: #1b441b; color: #1b441b; }
+        .answers { margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+        .answer-item { background: #f4f9f4; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: 0.88rem; }
+        .answer-user { font-weight: bold; color: #2d5e2d; font-size: 0.8rem; margin-bottom: 2px; }
+        .answer-input-row { display: flex; gap: 6px; margin-top: 8px; }
+        .answer-input-row input {
+            flex: 1; padding: 8px; border: 1.5px solid #ccc; border-radius: 6px; font-size: 0.85rem;
+        }
+        .answer-input-row button {
+            padding: 8px 12px; background: #2d5e2d; color: white; border: none;
+            border-radius: 6px; font-size: 0.8rem; cursor: pointer;
+        }
+        .empty-msg { text-align: center; color: #999; padding: 20px; font-size: 0.9rem; }
+        footer {
+            text-align: center; margin-top: 30px; padding: 14px;
+            font-size: 0.8rem; color: #777;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/static/index.html">←</a>
+        <h1 id="pageTitle">💬 Community Q&A</h1>
+        <div class="lang-toggle">
+            <button id="btnEn" class="active" onclick="setLang('en')">EN</button>
+            <button id="btnTa" onclick="setLang('ta')">தமிழ்</button>
+        </div>
+    </header>
+
+    <div class="profile-bar">👤 Farmer Profile: <b id="farmerName">Guest</b></div>
+
+    <div class="container">
+        <div class="ask-box">
+            <h3 id="lblAsk">Ask the Community</h3>
+            <div class="input-row">
+                <textarea id="questionInput" placeholder="Type or speak your farming question..."></textarea>
+                <button class="mic-btn" id="micBtn" onclick="toggleVoice()">🎤</button>
+            </div>
+            <div class="voice-status" id="voiceStatus"></div>
+            <button class="post-btn" onclick="postQuestion()" id="lblPostBtn">Post Question</button>
+            <p id="status-msg"></p>
+        </div>
+
+        <h3 style="margin-bottom:12px;color:#2d5e2d;" id="lblRecentQ">Recent Questions</h3>
+        <div id="questionsList"><div class="empty-msg">Loading...</div></div>
+    </div>
+
+    <footer>Developed by Nithish | Software Engineering Student</footer>
+
+    <script>
+        const username = localStorage.getItem('farmer_username') || 'Anonymous';
+        document.getElementById('farmerName').textContent = username;
+
+        let currentLang = 'en';
+        let recognition = null;
+        let isRecording = false;
+        let synth = window.speechSynthesis;
+        let isSpeaking = false;
+        let speakingId = null;
+
+        const t = {
+            en: {
+                title: '💬 Community Q&A', ask: 'Ask the Community',
+                placeholder: 'Type or speak your farming question...',
+                postBtn: 'Post Question', recentQ: 'Recent Questions',
+                voiceListening: '🔴 Listening... speak now', voiceDone: '✅ Got it!',
+                empty: 'No questions yet. Be the first to ask!',
+                askAI: '🤖 Ask AI', answer: '💬 Answer', delete: '🗑️ Delete', speak: '🔊 Read',
+                answerPlaceholder: 'Write an answer...', post: 'Post'
+            },
+            ta: {
+                title: '💬 சமூக கேள்வி பதில்', ask: 'சமூகத்திடம் கேளுங்கள்',
+                placeholder: 'உங்கள் வேளாண் கேள்வியை தட்டச்சு செய்யவும் அல்லது பேசவும்...',
+                postBtn: 'கேள்வியை பதிவிடவும்', recentQ: 'சமீபத்திய கேள்விகள்',
+                voiceListening: '🔴 கேட்கிறேன்... இப்போது பேசுங்கள்', voiceDone: '✅ கிடைத்தது!',
+                empty: 'இன்னும் கேள்விகள் இல்லை. முதலில் கேளுங்கள்!',
+                askAI: '🤖 AI கேளுங்கள்', answer: '💬 பதில்', delete: '🗑️ நீக்கு', speak: '🔊 படிக்க',
+                answerPlaceholder: 'ஒரு பதிலை எழுதுங்கள்...', post: 'பதிவிடு'
+            }
+        };
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.getElementById('pageTitle').textContent = t[lang].title;
+            document.getElementById('lblAsk').textContent = t[lang].ask;
+            document.getElementById('questionInput').placeholder = t[lang].placeholder;
+            document.getElementById('lblPostBtn').textContent = t[lang].postBtn;
+            document.getElementById('lblRecentQ').textContent = t[lang].recentQ;
+            document.getElementById('btnEn').classList.toggle('active', lang === 'en');
+            document.getElementById('btnTa').classList.toggle('active', lang === 'ta');
+            localStorage.setItem('app_lang', lang);
+            loadQuestions();
+        }
+
+        const savedLang = localStorage.getItem('app_lang');
+        if (savedLang) currentLang = savedLang;
+        setLang(currentLang);
+
+        function toggleVoice() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Voice input not supported. Please use Chrome.');
+                return;
+            }
+            if (isRecording) { recognition.stop(); return; }
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SR();
+            recognition.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            recognition.interimResults = false;
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('micBtn').classList.add('recording');
+                document.getElementById('micBtn').textContent = '⏹';
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceListening;
+            };
+            recognition.onresult = (e) => {
+                document.getElementById('questionInput').value = e.results[0][0].transcript;
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceDone;
+            };
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+            };
+            recognition.onerror = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+                document.getElementById('voiceStatus').textContent = '❌ Could not hear. Try again.';
+            };
+            recognition.start();
+        }
+
+        function speakText(text, id) {
+            if (isSpeaking && speakingId === id) {
+                synth.cancel();
+                isSpeaking = false;
+                speakingId = null;
+                return;
+            }
+            synth.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            utterance.rate = 0.9;
+            utterance.onstart = () => { isSpeaking = true; speakingId = id; };
+            utterance.onend = () => { isSpeaking = false; speakingId = null; };
+            synth.speak(utterance);
+        }
+
+        async function postQuestion() {
+            const question = document.getElementById('questionInput').value.trim();
+            if (!question) { showMsg('Please enter a question.', 'red'); return; }
+            try {
+                const res = await fetch('/community/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, question, lang: currentLang })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('questionInput').value = '';
+                    showMsg('Question posted!', 'green');
+                    loadQuestions();
+                } else {
+                    showMsg(data.message, 'red');
+                }
+            } catch (e) {
+                showMsg('Error: could not reach server.', 'red');
+            }
+        }
+
+        async function loadQuestions() {
+            const list = document.getElementById('questionsList');
+            try {
+                const res = await fetch('/community/questions');
+                const data = await res.json();
+                if (!data.questions || data.questions.length === 0) {
+                    list.innerHTML = `<div class="empty-msg">${t[currentLang].empty}</div>`;
+                    return;
+                }
+                list.innerHTML = data.questions.map(q => {
+                    const answersHtml = (q.answers || []).map(a => `
+                        <div class="answer-item">
+                            <div class="answer-user">${a.username}</div>
+                            <div>${a.answer}</div>
+                        </div>
+                    `).join('');
+                    const canDelete = q.username === username;
+                    return `
+                        <div class="question-card">
+                            <div class="q-header">
+                                <span class="q-user">${q.username}</span>
+                                <span class="q-time">${new Date(q.timestamp * 1000).toLocaleString('en-IN')}</span>
+                            </div>
+                            <div class="q-text">${q.question}</div>
+                            <div class="q-actions">
+                                <button class="speak-btn" onclick='speakText(${JSON.stringify(q.question)}, "${q.id}")'>${t[currentLang].speak}</button>
+                                <button class="ai-btn" onclick="askAI('${q.id}', ${JSON.stringify(q.question)})">${t[currentLang].askAI}</button>
+                                ${canDelete ? `<button class="delete-btn" onclick="deleteQuestion('${q.id}')">${t[currentLang].delete}</button>` : ''}
+                            </div>
+                            <div class="answers">
+                                ${answersHtml}
+                                <div class="answer-input-row">
+                                    <input type="text" id="ans-${q.id}" placeholder="${t[currentLang].answerPlaceholder}">
+                                    <button onclick="postAnswer('${q.id}')">${t[currentLang].post}</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                list.innerHTML = '<div class="empty-msg">Could not load questions.</div>';
+            }
+        }
+
+        async function postAnswer(questionId) {
+            const input = document.getElementById(`ans-${questionId}`);
+            const answer = input.value.trim();
+            if (!answer) return;
+            try {
+                await fetch('/community/answer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question_id: questionId, username, answer })
+                });
+                loadQuestions();
+            } catch (e) {}
+        }
+
+        async function askAI(questionId, questionText) {
+            try {
+                await fetch('/community/ai-answer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question_id: questionId, question: questionText, lang: currentLang })
+                });
+                loadQuestions();
+            } catch (e) {}
+        }
+
+        async function deleteQuestion(questionId) {
+            if (!confirm('Delete this question?')) return;
+            try {
+                await fetch('/community/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question_id: questionId, username })
+                });
+                loadQuestions();
+            } catch (e) {}
+        }
+
+        function showMsg(text, color) {
+            const msg = document.getElementById('status-msg');
+            msg.textContent = text;
+            msg.style.color = color === 'red' ? '#d32f2f' : '#2d5e2d';
+            setTimeout(() => { msg.textContent = ''; }, 2500);
+        }
+    </script>
+</body>
+</html>
