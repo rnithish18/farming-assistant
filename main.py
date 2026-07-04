@@ -40,6 +40,26 @@ app = FastAPI(title="Farming AI Assistant")
 def strip_think_tags(text: str) -> str:
     return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
+def log_activity(username: str, feature_type: str, search_summary: str, result_text: str = ""):
+    """Save an activity log entry showing what was searched and a preview of what was returned."""
+    try:
+        if not username or username == "Anonymous":
+            return
+        preview = result_text.strip().replace("\n", " ")
+        if len(preview) > 150:
+            preview = preview[:150] + "..."
+        details = search_summary
+        if preview:
+            details = f"{search_summary} → {preview}"
+        db["activity_logs"].insert_one({
+            "username": username,
+            "feature_type": feature_type,
+            "query_details": details,
+            "timestamp": time.time()
+        })
+    except Exception as e:
+        print(f"Activity log error: {e}")
+
 # --- PYDANTIC SCHEMAS ---
 class ChatRequest(BaseModel):
     message: str
@@ -456,6 +476,7 @@ def chat(request: ChatRequest):
         max_tokens=1024
     )
     reply = strip_think_tags(response.choices[0].message.content)
+    log_activity(request.username, "AI Chat", f"Asked: {request.message[:60]}", reply)
     return {"reply": reply}
 
 
@@ -487,7 +508,9 @@ async def diagnose(file: UploadFile = File(...), lang: str = "en", username: str
         }],
         max_tokens=1024
     )
-    return {"diagnosis": strip_think_tags(response.choices[0].message.content)}
+    diagnosis = strip_think_tags(response.choices[0].message.content)
+    log_activity(username, "Crop Diagnosis", f"Uploaded photo: {file.filename}", diagnosis)
+    return {"diagnosis": diagnosis}
 
 
 # --- WEATHER ---
@@ -506,6 +529,7 @@ def get_weather(city: str, lang: str = "en", username: str = "Anonymous"):
         tip = "மிகவும் சூடான நாள்." if temp > 38 else "அதிக ஈரப்பதம்." if humidity > 80 else "நல்ல விவசாய சூழல்."
     else:
         tip = "Very hot — water crops early morning." if temp > 38 else "High humidity — watch for fungal diseases." if humidity > 80 else "Good farming conditions."
+    log_activity(username, "Live Weather", f"City: {data['name']}", f"{temp}°C, {data['weather'][0]['description']}, {tip}")
     return {
         "city": data["name"], "temperature": temp,
         "feels_like": data["main"]["feels_like"], "humidity": humidity,
@@ -554,6 +578,7 @@ def get_forecast(city: str, lang: str = "en", username: str = "Anonymous"):
             "date": date, "avg_temp": avg_temp, "avg_humidity": avg_humidity,
             "description": most_common_desc, "rain_mm": rain_mm, "farming_advice": advice
         })
+    log_activity(username, "Rain Forecast", f"City: {data['city']['name']}", f"7-day outlook, first day: {forecast[0]['description']}, {forecast[0]['rain_mm']}mm rain")
     return {"city": data["city"]["name"], "forecast": forecast}
 
 
@@ -572,7 +597,9 @@ def get_market_prices(crop: str, state: str = "Tamil Nadu", lang: str = "en", us
         messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
         max_tokens=512
     )
-    return {"prices": strip_think_tags(response.choices[0].message.content)}
+    prices = strip_think_tags(response.choices[0].message.content)
+    log_activity(username, "Market Prices", f"Crop: {crop}, State: {state}", prices)
+    return {"prices": prices}
 
 
 # --- SOIL ---
@@ -590,7 +617,9 @@ def get_soil_tips(crop: str, season: str, soil_type: str, lang: str = "en", user
         messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
         max_tokens=1024
     )
-    return {"tips": strip_think_tags(response.choices[0].message.content)}
+    tips = strip_think_tags(response.choices[0].message.content)
+    log_activity(username, "Soil Advisory", f"Crop: {crop}, Season: {season}, Soil: {soil_type}", tips)
+    return {"tips": tips}
 
 
 # --- PEST ---
@@ -608,7 +637,9 @@ def get_pest_alerts(crop: str, state: str, season: str, lang: str = "en", userna
         messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
         max_tokens=1024
     )
-    return {"alerts": strip_think_tags(response.choices[0].message.content)}
+    alerts = strip_think_tags(response.choices[0].message.content)
+    log_activity(username, "Pest Alerts", f"Crop: {crop}, State: {state}, Season: {season}", alerts)
+    return {"alerts": alerts}
 
 
 # --- SCHEMES ---
@@ -626,7 +657,9 @@ def get_schemes(state: str, category: str = "All", lang: str = "en", username: s
         messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
         max_tokens=1024
     )
-    return {"schemes": strip_think_tags(response.choices[0].message.content)}
+    schemes = strip_think_tags(response.choices[0].message.content)
+    log_activity(username, "Govt Schemes", f"State: {state}, Category: {category}", schemes)
+    return {"schemes": schemes}
 
 
 # --- CROP CALENDAR ---
@@ -644,7 +677,9 @@ def get_crop_calendar(crop: str, state: str = "Tamil Nadu", lang: str = "en", us
         messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
         max_tokens=1024
     )
-    return {"calendar": strip_think_tags(response.choices[0].message.content)}
+    calendar = strip_think_tags(response.choices[0].message.content)
+    log_activity(username, "Crop Calendar", f"Crop: {crop}, State: {state}", calendar)
+    return {"calendar": calendar}
 
 @app.get("/fertilizer-calculator")
 def get_fertilizer_calculator(crop: str, land_size: float, land_unit: str = "acre", soil_type: str = "Loamy", growth_stage: str = "Sowing / Land Preparation", lang: str = "en", username: str = "Anonymous"):
@@ -675,7 +710,9 @@ Farmer Tip: [one practical tip]"""
         messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
         max_tokens=1024
     )
-    return {"result": strip_think_tags(response.choices[0].message.content)}
+    result = strip_think_tags(response.choices[0].message.content)
+    log_activity(username, "Fertilizer Calculator", f"Crop: {crop}, {land_size} {land_unit}, Soil: {soil_type}", result)
+    return {"result": result}
 
 @app.post("/add-expense")
 def add_expense(data: dict):
@@ -766,7 +803,9 @@ Top Pick: [recommend one crop as the best choice and why]"""
         messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
         max_tokens=1024
     )
-    return {"result": strip_think_tags(response.choices[0].message.content)}
+    result = strip_think_tags(response.choices[0].message.content)
+    log_activity(username, "Crop Recommendation", f"Soil: {soil_type}, Season: {season}, State: {state}", result)
+    return {"result": result}
 
 @app.get("/yield-prediction")
 def get_yield_prediction(crop: str, land_size: float, land_unit: str = "acre", soil_type: str = "Loamy", irrigation: str = "Rain-fed", lang: str = "en", username: str = "Anonymous"):
@@ -795,6 +834,8 @@ Prediction Confidence: [note that this is a general AI estimate, not a precise s
         messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
         max_tokens=1024
     )
-    return {"result": strip_think_tags(response.choices[0].message.content)}
+    result = strip_think_tags(response.choices[0].message.content)
+    log_activity(username, "Yield Prediction", f"Crop: {crop}, {land_size} {land_unit}, {irrigation}", result)
+    return {"result": result}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
