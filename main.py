@@ -22,6 +22,7 @@ OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 # Brevo API credentials (from environment variables)
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+OWNER_EMAIL = os.getenv("OWNER_EMAIL")
 
 # MongoDB Connection
 mongo_client = MongoClient(os.getenv("MONGODB_URI"))
@@ -130,6 +131,43 @@ def send_otp_email(email: str, name: str, otp: str, subject: str):
         return False
 
 
+def notify_owner(event_type: str, username: str, email: str = None, extra: str = ""):
+    """Send a plain notification email to the owner whenever a user registers or logs in."""
+    if not OWNER_EMAIL:
+        return
+    try:
+        when = time.strftime("%d %b %Y, %I:%M %p", time.localtime())
+        html_content = f"""
+        <div style="font-family:Arial,sans-serif;max-width:420px;margin:auto;
+                    background:#f4f9f4;border-radius:12px;padding:24px;">
+            <h3 style="color:#2d5e2d;margin-top:0;">🌾 Farming Assistant — {event_type}</h3>
+            <p style="margin:4px 0;"><b>Username:</b> {username}</p>
+            <p style="margin:4px 0;"><b>Email:</b> {email or 'N/A (guest account)'}</p>
+            <p style="margin:4px 0;"><b>Time:</b> {when}</p>
+            {f'<p style="margin:4px 0;">{extra}</p>' if extra else ''}
+        </div>
+        """
+        payload = {
+            "sender": {"name": "Farming Assistant", "email": SENDER_EMAIL},
+            "to": [{"email": OWNER_EMAIL, "name": "Owner"}],
+            "subject": f"Farming Assistant — {event_type}: {username}",
+            "htmlContent": html_content
+        }
+        headers = {
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json"
+        }
+        requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            json=payload,
+            headers=headers,
+            timeout=10
+        )
+    except Exception as e:
+        print(f"Owner notification error: {e}")
+
+
 # --- AUTH ENDPOINTS ---
 
 @app.post("/send-otp")
@@ -177,6 +215,7 @@ def guest_login(data: dict):
     if existing and not existing.get("is_guest"):
         return {"success": False, "message": "That name is taken by a registered account. Please choose another."}
 
+    is_new = not existing
     if not existing:
         users_col.insert_one({
             "username": username,
@@ -185,6 +224,8 @@ def guest_login(data: dict):
             "is_guest": True,
             "created_at": time.time()
         })
+
+    notify_owner("New Guest Signup" if is_new else "Guest Login", username, None)
 
     return {"success": True, "message": f"Welcome, {username}!", "username": username}
 
@@ -204,7 +245,7 @@ def register(request: RegisterRequest):
         return {"success": False, "message": "Username already taken. Please choose another."}
 
     if users_col.find_one({"email": email}):
-        return {"success": False, "message": "Email already registered. Please login."}
+        return {"success": False, "message": "This email is already used. Please login instead."}
 
     hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
 
@@ -215,6 +256,8 @@ def register(request: RegisterRequest):
         "is_guest": False,
         "created_at": time.time()
     })
+
+    notify_owner("New User Registered", username, email)
 
     return {"success": True, "message": f"Account created! Welcome {username}."}
 
@@ -233,6 +276,8 @@ def login(request: LoginRequest):
 
     if not bcrypt.checkpw(password.encode("utf-8"), user["password"]):
         return {"success": False, "message": "Incorrect password. Please try again."}
+
+    notify_owner("Returning User Login", username, user.get("email"))
 
     return {"success": True, "message": f"Welcome back, {username}!", "username": username}
 
@@ -285,6 +330,36 @@ def reset_password(request: ResetPasswordRequest):
     del otp_store[key]
 
     return {"success": True, "message": "Password reset successfully! Please login."}
+
+
+# --- DELETE ACCOUNT ---
+
+@app.post("/delete-account")
+def delete_account(data: dict):
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+
+    if not username:
+        return {"success": False, "message": "Missing username"}
+
+    user = users_col.find_one({"username": username})
+    if not user:
+        return {"success": False, "message": "User not found"}
+
+    if not user.get("is_guest"):
+        if not password:
+            return {"success": False, "message": "Password is required to delete your account."}
+        if not bcrypt.checkpw(password.encode("utf-8"), user["password"]):
+            return {"success": False, "message": "Incorrect password."}
+
+    users_col.delete_one({"username": username})
+    db["activity_logs"].delete_many({"username": username})
+    db["expenses"].delete_many({"username": username})
+    db["community"].delete_many({"username": username})
+
+    notify_owner("Account Deleted", username, user.get("email"))
+
+    return {"success": True, "message": "Account deleted successfully."}
 
 
 # --- PROFILE PHOTO ---
