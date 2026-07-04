@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Farming AI Assistant - Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -193,7 +194,7 @@
                 <h3>🕒 Recent Activity Logs</h3>
                 <div style="display:flex;gap:8px;">
                     <button onclick="downloadHistory()" style="padding:6px 12px;background:#2d5e2d;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:bold;">⬇️ CSV</button>
-                    <button onclick="downloadHistoryPDF()" style="padding:6px 12px;background:#1b441b;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:bold;">📄 PDF</button>
+                    <button id="pdfBtn" onclick="downloadHistoryPDF()" style="padding:6px 12px;background:#1b441b;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:bold;">📄 PDF</button>
                     <button onclick="clearHistory()" style="padding:6px 12px;background:#c62828;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:bold;">🗑️ Clear</button>
                 </div>
             </div>
@@ -300,35 +301,90 @@
             URL.revokeObjectURL(url);
         }
 
-        function downloadHistoryPDF() {
+        // PDF export: renders the history as real HTML (so Tamil/English both
+        // display correctly using the browser's own font rendering), snapshots
+        // it as an image with html2canvas, then places that image into the PDF.
+        // This avoids jsPDF's built-in font, which has no Tamil glyphs and was
+        // producing garbled text.
+        async function downloadHistoryPDF() {
             if (!lastHistoryData || lastHistoryData.length === 0) {
                 alert("No activity to download yet.");
                 return;
             }
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            doc.setFontSize(16);
-            doc.text("Farming Assistant - Activity History", 14, 18);
-            doc.setFontSize(10);
-            doc.text(`Farmer: ${savedUser}`, 14, 26);
-            doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 14, 32);
 
-            let y = 44;
-            doc.setFontSize(11);
+            const pdfBtn = document.getElementById('pdfBtn');
+            const originalBtnText = pdfBtn.textContent;
+            pdfBtn.disabled = true;
+            pdfBtn.textContent = '⏳ Generating...';
+
+            const printArea = document.createElement('div');
+            printArea.style.cssText = `
+                position: fixed; left: -9999px; top: 0; width: 750px;
+                background: #ffffff; padding: 30px;
+                font-family: Arial, "Noto Sans Tamil", sans-serif; color: #111;
+            `;
+
+            let html = `
+                <h2 style="margin:0 0 6px;">Farming Assistant - Activity History</h2>
+                <p style="margin:2px 0;font-size:14px;">Farmer: ${savedUser}</p>
+                <p style="margin:2px 0 20px;font-size:14px;">Generated: ${new Date().toLocaleString('en-IN')}</p>
+            `;
+
             lastHistoryData.forEach((item, i) => {
-                if (y > 275) { doc.addPage(); y = 20; }
                 const date = new Date(item.time * 1000).toLocaleString('en-IN');
-                doc.setFont(undefined, 'bold');
-                doc.text(`${i + 1}. ${item.feature}`, 14, y);
-                doc.setFont(undefined, 'normal');
-                doc.text(date, 150, y);
-                y += 6;
-                const lines = doc.splitTextToSize(String(item.query), 180);
-                doc.text(lines, 14, y);
-                y += lines.length * 5 + 6;
+                const safeQuery = String(item.query)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                html += `
+                    <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #ddd;">
+                        <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:15px;">
+                            <span>${i + 1}. ${item.feature}</span>
+                            <span style="font-weight:normal;font-size:12px;color:#555;">${date}</span>
+                        </div>
+                        <div style="margin-top:6px;line-height:1.6;font-size:13px;white-space:pre-wrap;">${safeQuery}</div>
+                    </div>
+                `;
             });
 
-            doc.save(`farming_activity_${savedUser}.pdf`);
+            printArea.innerHTML = html;
+            document.body.appendChild(printArea);
+
+            try {
+                const canvas = await html2canvas(printArea, { scale: 2, backgroundColor: '#ffffff' });
+                document.body.removeChild(printArea);
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
+                const imgWidth = pageWidth;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                const imgData = canvas.toDataURL('image/png');
+
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft > 0) {
+                    position = heightLeft - imgHeight;
+                    doc.addPage();
+                    doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+
+                doc.save(`farming_activity_${savedUser}.pdf`);
+            } catch (e) {
+                if (document.body.contains(printArea)) {
+                    document.body.removeChild(printArea);
+                }
+                alert('Could not generate PDF. Please try again.');
+            } finally {
+                pdfBtn.disabled = false;
+                pdfBtn.textContent = originalBtnText;
+            }
         }
 
         async function clearHistory() {

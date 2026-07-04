@@ -15,18 +15,12 @@ import requests
 from pymongo import MongoClient
 from bson import ObjectId
 
-# --- SMTP EMAIL IMPORTS ---
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
 load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
-# Brevo SMTP credentials (from environment variables)
-BREVO_SMTP_LOGIN = os.getenv("BREVO_SMTP_LOGIN")
-BREVO_SMTP_KEY = os.getenv("BREVO_SMTP_KEY")
+# Brevo API credentials (from environment variables)
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 
 # MongoDB Connection
@@ -95,14 +89,9 @@ def chrome_devtools():
     return Response(status_code=204)
 
 
-# --- BREVO SMTP EMAIL SENDING ---
+# --- BREVO API EMAIL SENDING ---
 def send_otp_email(email: str, name: str, otp: str, subject: str):
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"Farming Assistant <{SENDER_EMAIL}>"
-        msg["To"] = email
-
         html_content = f"""
         <div style="font-family:Arial,sans-serif;max-width:400px;margin:auto;
                     background:#f0f7f0;border-radius:12px;padding:30px;text-align:center">
@@ -115,15 +104,29 @@ def send_otp_email(email: str, name: str, otp: str, subject: str):
             <p style="color:#999;font-size:0.8rem">Do not share this code with anyone.</p>
         </div>
         """
-        msg.attach(MIMEText(html_content, "html"))
-
-        with smtplib.SMTP("smtp-relay.brevo.com", 587) as server:
-            server.starttls()
-            server.login(BREVO_SMTP_LOGIN, BREVO_SMTP_KEY)
-            server.sendmail(SENDER_EMAIL, email, msg.as_string())
-        return True
+        payload = {
+            "sender": {"name": "Farming Assistant", "email": SENDER_EMAIL},
+            "to": [{"email": email, "name": name}],
+            "subject": subject,
+            "htmlContent": html_content
+        }
+        headers = {
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json"
+        }
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            json=payload,
+            headers=headers,
+            timeout=10
+        )
+        if response.status_code in (200, 201):
+            return True
+        print(f"Brevo API email delivery error: {response.status_code} {response.text}")
+        return False
     except Exception as e:
-        print(f"Brevo SMTP email delivery error: {e}")
+        print(f"Brevo API email delivery error: {e}")
         return False
 
 
