@@ -131,6 +131,61 @@ def send_otp_email(email: str, name: str, otp: str, subject: str):
         return False
 
 
+def notify_users_of_new_question(asker_username: str, question: str, lang: str):
+    """Email every other registered user (who has an email on file) that a new community question was posted."""
+    if not BREVO_API_KEY or not SENDER_EMAIL:
+        return
+    try:
+        recipients = list(users_col.find(
+            {"email": {"$ne": None}, "username": {"$ne": asker_username}},
+            {"username": 1, "email": 1}
+        ))
+        if not recipients:
+            return
+
+        safe_question = (question[:200] + "...") if len(question) > 200 else question
+
+        for user in recipients:
+            to_email = user.get("email")
+            to_name = user.get("username", "Farmer")
+            if not to_email:
+                continue
+            try:
+                html_content = f"""
+                <div style="font-family:Arial,sans-serif;max-width:420px;margin:auto;
+                            background:#f4f9f4;border-radius:12px;padding:24px;">
+                    <h3 style="color:#2d5e2d;margin-top:0;">🌾 New Question in Community Q&A</h3>
+                    <p style="margin:4px 0;"><b>{asker_username}</b> just asked:</p>
+                    <p style="margin:8px 0;padding:12px;background:white;border-radius:8px;
+                              border-left:4px solid #2d5e2d;">{safe_question}</p>
+                    <p style="margin-top:16px;font-size:0.9rem;color:#555;">
+                        Open the app and visit Community Q&A to answer or discuss.
+                    </p>
+                </div>
+                """
+                payload = {
+                    "sender": {"name": "Farming Assistant", "email": SENDER_EMAIL},
+                    "to": [{"email": to_email, "name": to_name}],
+                    "subject": f"New question from {asker_username} on Farming Assistant",
+                    "htmlContent": html_content
+                }
+                headers = {
+                    "accept": "application/json",
+                    "api-key": BREVO_API_KEY,
+                    "content-type": "application/json"
+                }
+                requests.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    json=payload,
+                    headers=headers,
+                    timeout=10
+                )
+            except Exception as inner_e:
+                print(f"Failed to notify {to_email}: {inner_e}")
+    except Exception as e:
+        print(f"notify_users_of_new_question error: {e}")
+
+
 def notify_owner(event_type: str, username: str, email: str = None, extra: str = ""):
     """Send a plain notification email to the owner whenever a user registers or logs in."""
     if not OWNER_EMAIL:
@@ -976,6 +1031,7 @@ def post_question(data: dict):
     }
     result = db["community"].insert_one(doc)
     log_activity(username, "Community Q&A", f"Asked: {question[:60]}")
+    notify_users_of_new_question(username, question, lang)
     return {"success": True, "message": "Question posted", "id": str(result.inserted_id)}
 
 
