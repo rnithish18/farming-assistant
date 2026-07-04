@@ -457,6 +457,9 @@ def serve_yield(): return FileResponse("static/yield.html")
 @app.get("/community.html", response_class=HTMLResponse)
 def serve_community(): return FileResponse("static/community.html")
 
+@app.get("/irrigation.html", response_class=HTMLResponse)
+def serve_irrigation(): return FileResponse("static/irrigation.html")
+
 # --- CHAT ---
 
 @app.post("/chat")
@@ -840,6 +843,40 @@ Prediction Confidence: [note that this is a general AI estimate, not a precise s
     )
     result = strip_think_tags(response.choices[0].message.content)
     log_activity(username, "Yield Prediction", f"Crop: {crop}, {land_size} {land_unit}, {irrigation}", result)
+    return {"result": result}
+
+
+# --- IRRIGATION SCHEDULER ---
+
+@app.get("/irrigation-schedule")
+def get_irrigation_schedule(crop: str, soil_type: str = "Loamy", growth_stage: str = "Sowing / Land Preparation", season: str = "Kharif (Monsoon)", irrigation_method: str = "Rain-fed", lang: str = "en", username: str = "Anonymous"):
+    if lang == "ta":
+        prompt = f"""{crop} பயிருக்கு, {soil_type} மண் வகையில், {growth_stage} கட்டத்தில், {season} பருவத்தில், {irrigation_method} முறையில் தேவையான நீர்ப்பாசன அட்டவணையை தமிழில் கொடுக்கவும்.
+
+இந்த வடிவத்தில் பதில் கொடுக்கவும்:
+நீர்ப்பாசன அதிர்வெண்: [எத்தனை நாட்களுக்கு ஒருமுறை]
+ஒவ்வொரு முறையும் தேவையான நீர் அளவு: [மிமீ அல்லது லிட்டரில்]
+சிறந்த நேரம்: [காலை/மாலை போன்றவை]
+கவனிக்க வேண்டியவை: [மண் ஈரப்பதம் சரிபார்ப்பு, வானிலை மாற்றங்கள் போன்றவை]
+விவசாயி குறிப்பு: [ஒரு நடைமுறை குறிப்பு]"""
+        system_msg = "நீங்கள் ஒரு இந்திய வேளாண் நீர்ப்பாசன நிபுணர். நடைமுறை அட்டவணையுடன் தமிழில் மட்டும் பதில் கொடுக்கவும்."
+    else:
+        prompt = f"""Create a practical irrigation schedule for {crop}, grown in {soil_type} soil, currently at the {growth_stage} stage, during {season} season, using {irrigation_method} irrigation.
+
+Give the response in this exact format:
+Irrigation Frequency: [how often, e.g. every X days]
+Water Amount per Session: [in mm or liters]
+Best Time of Day: [e.g. early morning / evening]
+Things to Watch: [soil moisture checks, weather changes to adjust for]
+Farmer Tip: [one practical tip]"""
+        system_msg = "You are an Indian agricultural irrigation expert. Give a practical, easy-to-follow watering schedule based on typical Indian farming conditions."
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
+        max_tokens=1024
+    )
+    result = strip_think_tags(response.choices[0].message.content)
+    log_activity(username, "Irrigation Scheduler", f"Crop: {crop}, Soil: {soil_type}, Stage: {growth_stage}", result)
     return {"result": result}
 
 

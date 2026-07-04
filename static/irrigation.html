@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Irrigation Scheduler - Farming Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background-color: #f4f9f4; color: #1a3d1a; }
+        header {
+            background: linear-gradient(135deg, #2d5e2d, #1b441b);
+            color: white; padding: 15px 20px;
+            display: flex; align-items: center; gap: 15px;
+        }
+        header a { color: white; text-decoration: none; font-size: 1.5rem; }
+        header h1 { font-size: 1.1rem; flex: 1; }
+        .lang-toggle {
+            display: flex; background: rgba(255,255,255,0.2);
+            border-radius: 20px; overflow: hidden;
+        }
+        .lang-toggle button {
+            background: none; border: none; color: white;
+            padding: 6px 12px; font-size: 0.85rem; cursor: pointer;
+        }
+        .lang-toggle button.active {
+            background: white; color: #2d5e2d; font-weight: bold;
+        }
+        .profile-bar {
+            background: #e8f5e9; padding: 10px 20px; text-align: right;
+            border-bottom: 1px solid #d0e2d0; font-size: 0.85rem; color: #1b441b;
+        }
+        .container { max-width: 500px; margin: 20px auto; padding: 0 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 0.9rem; }
+        select, input {
+            width: 100%; padding: 12px; border: 1.5px solid #ccc;
+            border-radius: 8px; font-size: 0.95rem; margin-bottom: 14px;
+            font-family: inherit; background: white;
+        }
+        .input-row { display: flex; gap: 8px; align-items: flex-start; }
+        .input-row input { flex: 1; }
+        .mic-btn {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: #2d5e2d; color: white; border: none;
+            font-size: 1.2rem; cursor: pointer; flex-shrink: 0;
+        }
+        .mic-btn.recording { background: #cc0000; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+        .voice-status { text-align: center; color: #cc0000; font-size: 0.85rem; margin: -8px 0 10px; min-height: 18px; }
+        .btn-row { display: flex; gap: 10px; }
+        button.main-btn {
+            flex: 1; padding: 14px; background-color: #2d5e2d;
+            color: white; border: none; border-radius: 8px;
+            font-size: 1.05rem; cursor: pointer;
+        }
+        button.main-btn:disabled { background-color: #999; }
+        button.speak-btn {
+            width: 48px; height: 48px; background: #1b441b;
+            color: white; border: none; border-radius: 8px;
+            font-size: 1.2rem; cursor: pointer; flex-shrink: 0;
+        }
+        button.speak-btn.speaking { background: #cc0000; }
+        .loading { text-align: center; margin-top: 20px; color: #555; display: none; }
+        .result-box {
+            background: white; border-radius: 12px; padding: 20px;
+            margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: pre-wrap; line-height: 1.8; display: none; font-size: 0.95rem;
+        }
+        footer {
+            text-align: center; margin-top: 30px; padding: 14px;
+            font-size: 0.8rem; color: #777;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/static/index.html">←</a>
+        <h1 id="pageTitle">💧 Irrigation Scheduler</h1>
+        <div class="lang-toggle">
+            <button id="btnEn" class="active" onclick="setLang('en')">EN</button>
+            <button id="btnTa" onclick="setLang('ta')">தமிழ்</button>
+        </div>
+    </header>
+
+    <div class="profile-bar">👤 Farmer Profile: <b id="farmerName">Guest</b></div>
+
+    <div class="container">
+        <label id="lblCrop">Crop Name:</label>
+        <div class="input-row">
+            <input type="text" id="cropInput" placeholder="e.g. Rice, Cotton, Sugarcane">
+            <button class="mic-btn" id="micBtn" onclick="toggleVoice()">🎤</button>
+        </div>
+        <div class="voice-status" id="voiceStatus"></div>
+
+        <label id="lblSoil">Soil Type:</label>
+        <select id="soilType">
+            <option>Loamy</option>
+            <option>Clay</option>
+            <option>Sandy</option>
+            <option>Black (Regur)</option>
+            <option>Red</option>
+            <option>Alluvial</option>
+        </select>
+
+        <label id="lblStage">Growth Stage:</label>
+        <select id="growthStage">
+            <option value="Sowing / Land Preparation">Sowing / Land Preparation</option>
+            <option value="Vegetative Growth">Vegetative Growth</option>
+            <option value="Flowering">Flowering</option>
+            <option value="Fruiting / Grain Filling">Fruiting / Grain Filling</option>
+        </select>
+
+        <label id="lblSeason">Season:</label>
+        <select id="season">
+            <option>Kharif (Monsoon)</option>
+            <option>Rabi (Winter)</option>
+            <option>Zaid (Summer)</option>
+        </select>
+
+        <label id="lblMethod">Irrigation Method:</label>
+        <select id="irrigationMethod">
+            <option>Rain-fed</option>
+            <option>Canal</option>
+            <option>Borewell</option>
+            <option>Drip Irrigation</option>
+            <option>Sprinkler</option>
+        </select>
+
+        <div class="btn-row">
+            <button class="main-btn" id="scheduleBtn" onclick="getSchedule()">Get Schedule</button>
+            <button class="speak-btn" id="speakBtn" onclick="toggleSpeak()" title="Read aloud">🔊</button>
+        </div>
+
+        <div class="loading" id="loading">Building your irrigation schedule...</div>
+        <div class="result-box" id="resultBox"></div>
+    </div>
+
+    <footer>Developed by Nithish | Software Engineering Student</footer>
+
+    <script>
+        document.getElementById('farmerName').textContent = localStorage.getItem('farmer_username') || 'Guest';
+
+        let currentLang = 'en';
+        let recognition = null;
+        let isRecording = false;
+        let synth = window.speechSynthesis;
+        let isSpeaking = false;
+        let lastResult = '';
+
+        const t = {
+            en: {
+                title: '💧 Irrigation Scheduler', crop: 'Crop Name:', soil: 'Soil Type:',
+                stage: 'Growth Stage:', season: 'Season:', method: 'Irrigation Method:',
+                cropPlaceholder: 'e.g. Rice, Cotton, Sugarcane',
+                btn: 'Get Schedule', loading: 'Building your irrigation schedule...',
+                voiceListening: '🔴 Listening... speak now', voiceDone: '✅ Got it!'
+            },
+            ta: {
+                title: '💧 நீர்ப்பாசன அட்டவணை', crop: 'பயிர் பெயர்:', soil: 'மண் வகை:',
+                stage: 'வளர்ச்சி கட்டம்:', season: 'பருவம்:', method: 'நீர்ப்பாசன முறை:',
+                cropPlaceholder: 'எ.கா. நெல், பருத்தி, கரும்பு',
+                btn: 'அட்டவணை பெறவும்', loading: 'நீர்ப்பாசன அட்டவணை உருவாக்குகிறது...',
+                voiceListening: '🔴 கேட்கிறேன்... இப்போது பேசுங்கள்', voiceDone: '✅ கிடைத்தது!'
+            }
+        };
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.getElementById('pageTitle').textContent = t[lang].title;
+            document.getElementById('lblCrop').textContent = t[lang].crop;
+            document.getElementById('lblSoil').textContent = t[lang].soil;
+            document.getElementById('lblStage').textContent = t[lang].stage;
+            document.getElementById('lblSeason').textContent = t[lang].season;
+            document.getElementById('lblMethod').textContent = t[lang].method;
+            document.getElementById('cropInput').placeholder = t[lang].cropPlaceholder;
+            document.getElementById('scheduleBtn').textContent = t[lang].btn;
+            document.getElementById('loading').textContent = t[lang].loading;
+            document.getElementById('btnEn').classList.toggle('active', lang === 'en');
+            document.getElementById('btnTa').classList.toggle('active', lang === 'ta');
+            localStorage.setItem('app_lang', lang);
+        }
+
+        const savedLang = localStorage.getItem('app_lang');
+        if (savedLang) setLang(savedLang);
+
+        function toggleVoice() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Voice input not supported. Please use Chrome.');
+                return;
+            }
+            if (isRecording) { recognition.stop(); return; }
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SR();
+            recognition.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            recognition.interimResults = false;
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('micBtn').classList.add('recording');
+                document.getElementById('micBtn').textContent = '⏹';
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceListening;
+            };
+            recognition.onresult = (e) => {
+                document.getElementById('cropInput').value = e.results[0][0].transcript;
+                document.getElementById('voiceStatus').textContent = t[currentLang].voiceDone;
+            };
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+            };
+            recognition.onerror = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+                document.getElementById('voiceStatus').textContent = '❌ Could not hear. Try again.';
+            };
+            recognition.start();
+        }
+
+        function toggleSpeak() {
+            if (isSpeaking) {
+                synth.cancel();
+                isSpeaking = false;
+                document.getElementById('speakBtn').classList.remove('speaking');
+                document.getElementById('speakBtn').textContent = '🔊';
+                return;
+            }
+            if (!lastResult) { alert('No result to read. Please get a schedule first.'); return; }
+            const utterance = new SpeechSynthesisUtterance(lastResult);
+            utterance.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+            utterance.rate = 0.9;
+            utterance.onstart = () => {
+                isSpeaking = true;
+                document.getElementById('speakBtn').classList.add('speaking');
+                document.getElementById('speakBtn').textContent = '⏹';
+            };
+            utterance.onend = () => {
+                isSpeaking = false;
+                document.getElementById('speakBtn').classList.remove('speaking');
+                document.getElementById('speakBtn').textContent = '🔊';
+            };
+            synth.speak(utterance);
+        }
+
+        async function getSchedule() {
+            const crop = document.getElementById('cropInput').value.trim();
+            const soilType = document.getElementById('soilType').value;
+            const growthStage = document.getElementById('growthStage').value;
+            const season = document.getElementById('season').value;
+            const irrigationMethod = document.getElementById('irrigationMethod').value;
+            const btn = document.getElementById('scheduleBtn');
+            const loading = document.getElementById('loading');
+            const resultBox = document.getElementById('resultBox');
+            const username = localStorage.getItem('farmer_username') || 'Anonymous';
+
+            if (!crop) { alert('Please enter a crop name.'); return; }
+
+            if (isSpeaking) { synth.cancel(); isSpeaking = false; }
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            resultBox.style.display = 'none';
+            document.getElementById('voiceStatus').textContent = '';
+
+            try {
+                const params = new URLSearchParams({
+                    crop, soil_type: soilType, growth_stage: growthStage,
+                    season, irrigation_method: irrigationMethod,
+                    lang: currentLang, username
+                });
+                const response = await fetch(`/irrigation-schedule?${params}`);
+                const data = await response.json();
+                lastResult = data.result;
+                resultBox.textContent = data.result;
+                resultBox.style.display = 'block';
+            } catch (e) {
+                resultBox.textContent = 'Error: could not reach the server.';
+                resultBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
