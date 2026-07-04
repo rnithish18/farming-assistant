@@ -93,6 +93,19 @@
         <div class="box guest-note" id="guest-note" style="display:none;">
             👀 You're using a guest account. Register with email to unlock password protection and secure login.
         </div>
+
+        <div class="box" style="border:1.5px solid #ffcdd2;">
+            <h3 style="color:#c62828;">⚠️ Danger Zone</h3>
+            <p style="font-size:0.85rem;color:#666;margin-bottom:12px;">
+                Deleting your account permanently removes your profile, activity history, expenses, and community posts. This cannot be undone.
+            </p>
+            <div id="delete-password-field" style="display:none;">
+                <label>Enter your password to confirm:</label>
+                <input type="password" id="delete-password" placeholder="Your password">
+            </div>
+            <button id="deleteAccountBtn" onclick="handleDeleteClick()" style="background:#c62828;">🗑️ Delete My Account</button>
+            <p id="delete-status-msg" style="text-align:center;font-weight:bold;font-size:0.9rem;margin-top:10px;"></p>
+        </div>
     </div>
 
     <script>
@@ -153,6 +166,8 @@
             reader.readAsDataURL(file);
         }
 
+        let isGuestAccount = false;
+
         async function loadProfile() {
             try {
                 const res = await fetch(`/profile?username=${encodeURIComponent(username)}`);
@@ -167,6 +182,7 @@
                     if (data.is_guest) {
                         document.getElementById('password-box').style.display = 'none';
                         document.getElementById('guest-note').style.display = 'block';
+                        isGuestAccount = true;
                     }
                 }
             } catch (e) {
@@ -205,6 +221,67 @@
             const msg = document.getElementById('status-msg');
             msg.textContent = text;
             msg.style.color = color === 'red' ? '#d32f2f' : '#2d5e2d';
+        }
+
+        let deleteConfirmStep = false;
+
+        function handleDeleteClick() {
+            if (!deleteConfirmStep) {
+                const ok = confirm("Are you sure you want to permanently delete your account? This cannot be undone.");
+                if (!ok) return;
+
+                deleteConfirmStep = true;
+                if (!isGuestAccount) {
+                    document.getElementById('delete-password-field').style.display = 'block';
+                }
+                document.getElementById('deleteAccountBtn').textContent = '✅ Confirm Delete';
+                document.getElementById('delete-status-msg').textContent = isGuestAccount
+                    ? 'Click "Confirm Delete" to finish.'
+                    : 'Enter your password above, then click "Confirm Delete".';
+                document.getElementById('delete-status-msg').style.color = '#c62828';
+                return;
+            }
+
+            deleteAccount();
+        }
+
+        async function deleteAccount() {
+            const password = document.getElementById('delete-password').value.trim();
+
+            if (!isGuestAccount && !password) {
+                document.getElementById('delete-status-msg').textContent = 'Please enter your password.';
+                document.getElementById('delete-status-msg').style.color = '#d32f2f';
+                return;
+            }
+
+            const btn = document.getElementById('deleteAccountBtn');
+            btn.disabled = true;
+            btn.textContent = 'Deleting...';
+
+            try {
+                const res = await fetch('/delete-account', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('delete-status-msg').textContent = 'Account deleted. Redirecting...';
+                    document.getElementById('delete-status-msg').style.color = '#2d5e2d';
+                    localStorage.removeItem('farmer_username');
+                    setTimeout(() => { window.location.href = '/static/login.html'; }, 1500);
+                } else {
+                    document.getElementById('delete-status-msg').textContent = data.message;
+                    document.getElementById('delete-status-msg').style.color = '#d32f2f';
+                    btn.disabled = false;
+                    btn.textContent = '✅ Confirm Delete';
+                }
+            } catch (e) {
+                document.getElementById('delete-status-msg').textContent = 'Error: Could not reach server.';
+                document.getElementById('delete-status-msg').style.color = '#d32f2f';
+                btn.disabled = false;
+                btn.textContent = '✅ Confirm Delete';
+            }
         }
     </script>
 </body>
