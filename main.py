@@ -10,6 +10,8 @@ import re
 import random
 import time
 import bcrypt
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 import requests
 from pymongo import MongoClient
@@ -191,7 +193,7 @@ def notify_owner(event_type: str, username: str, email: str = None, extra: str =
     if not OWNER_EMAIL:
         return
     try:
-        when = time.strftime("%d %b %Y, %I:%M %p", time.localtime())
+        when = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M %p")
         html_content = f"""
         <div style="font-family:Arial,sans-serif;max-width:420px;margin:auto;
                     background:#f4f9f4;border-radius:12px;padding:24px;">
