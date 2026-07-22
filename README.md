@@ -3,7 +3,7 @@
 A bilingual (English/Tamil), voice-enabled web platform that gives Indian farmers instant, AI-driven agricultural advice — crop diagnosis, weather, market prices, irrigation planning, government schemes, financial tracking, and peer/AI community support — with no mandatory sign-up required.
 
 Built as an independent student project by **Nithish**, B.E. Computer Science and Engineering, V.S.B Engineering College, Karur, Tamil Nadu.
-
+live link:https://farming-assistant-fxvg.onrender.com/static/index.html
 ---
 
 ## ✨ Features
